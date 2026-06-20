@@ -170,4 +170,9 @@ echo "════════════════════════�
 echo "  Resultado: $PASS passed / $FAIL failed"
 [ -n "$CREATED_KEY" ] && echo "  Ticket creado: https://jira.zurich.com/browse/$CREATED_KEY"
 echo "══════════════════════════════════════"
+
+# shellcheck source=scripts/_test_log.sh
+source "$(dirname "$0")/_test_log.sh"
+_write_test_log "mcp" "$PASS" "$FAIL" "$CREATED_KEY"
+
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

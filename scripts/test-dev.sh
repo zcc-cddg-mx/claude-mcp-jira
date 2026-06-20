@@ -215,4 +215,8 @@ if [ -n "$CREATED_KEY" ]; then
 fi
 echo "══════════════════════════════════════"
 
+# shellcheck source=scripts/_test_log.sh
+source "$(dirname "$0")/_test_log.sh"
+_write_test_log "service" "$PASS" "$FAIL" "$CREATED_KEY"
+
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

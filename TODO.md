@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–4.3 completas + Docker validado (8/8 + 10/10). Toda la deuda técnica resuelta. Jira limpio.
+Estado general: Fases 1–4.3 completas + labels/actions implementados. Docker validado (8/8 + 10/10). Mejoras API pendientes según eval-apis-copilot + eval-swagger-copilot.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -12,6 +12,44 @@ Actualizar este archivo al completar o añadir tareas.
 ---
 
 ## Pendiente
+
+### Mejoras API (eval-apis-copilot + eval-swagger-copilot)
+
+#### Alta prioridad
+
+- [ ] **`POST /issues/{key}/comments`** — endpoint dedicado para comentarios
+  - Actualmente el comentario está dentro del `PATCH /issues/{key}` general → poco visible para MCP
+  - Patrón: texto libre → Claude → `{"comment": "..."}` → Jira `POST /rest/api/2/issue/{key}/comment`
+  - Agregar tool MCP `add_comment_jira_issue` (rol dev)
+
+- [ ] **Swagger deshabilitado en producción**
+  - En `service/main.py`: `docs_url="/docs" if ENV=="dev" else None`
+  - Variable de entorno `APP_ENV=dev|prod` en `.env.example` y `docker-compose.yml`
+
+#### Media prioridad
+
+- [ ] **`POST /issues/{key}/assign`** — endpoint dedicado para asignación
+  - Patrón: texto libre → Claude → `{"assignee": "user.name"}` → Jira `PUT /rest/api/2/issue/{key}/assignee`
+  - Agregar tool MCP `assign_jira_issue` (rol lead)
+
+- [ ] **`POST /issues/{key}/priority`** — endpoint dedicado para prioridad
+  - Actualmente dentro del `PATCH /issues/{key}` general
+  - Patrón: texto libre → Claude → `{"priority": "High"}` → ID mapping → Jira PUT
+  - Agregar tool MCP `set_priority_jira_issue` (rol lead)
+
+- [ ] **Migrar labels de `/actions` a `/issues/{key}/labels`**
+  - El eval clasifica labels como endpoint core (no long-tail)
+  - Mover lógica de `actions.py` a nuevo `service/routes/labels.py`
+  - `/actions` queda reservado para acciones long-tail: watchers, links, custom fields
+
+- [ ] **`/actions` tipado con enum** — validar `action` contra lista permitida antes de llamar a Claude
+  - Acciones long-tail iniciales: `add_watcher`, `link_issue`, `set_fix_version`, `set_component`, `update_custom_field`
+
+#### Baja prioridad / opcional
+
+- [ ] **`example` en `Field()` de schemas** — mejora UI de `/docs`
+  - Añadir `example=` en los campos `text` de cada `Request` model
+  - Sin impacto funcional, solo mejora la documentación interactiva
 
 ### Implementación
 

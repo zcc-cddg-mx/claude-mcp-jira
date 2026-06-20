@@ -1,26 +1,40 @@
 from .claude_client import (
+    parse_add_comment,
+    parse_assign_issue,
     parse_create_issue,
+    parse_labels,
     parse_log_work,
     parse_search_query,
+    parse_set_priority,
     parse_transition_issue,
     parse_update_issue,
     summarize_issue,
 )
 from .jira_client import (
+    add_comment,
+    assign_issue,
     create_issue,
     get_issue,
+    get_labels,
     get_transitions,
     log_work,
     search_issues,
+    set_priority,
     transition_issue,
     update_issue,
+    update_labels,
 )
 from .jql_builder import build_jql
 from .rate_limiter import check as rate_limit_check
 from .sanitizer import sanitize
 
 __all__ = [
+    "add_comment",
+    "assign_issue",
+    "parse_add_comment",
+    "parse_assign_issue",
     "parse_create_issue",
+    "parse_labels",
     "parse_log_work",
     "parse_search_query",
     "parse_transition_issue",
@@ -28,11 +42,15 @@ __all__ = [
     "summarize_issue",
     "create_issue",
     "get_issue",
+    "get_labels",
     "get_transitions",
     "log_work",
+    "parse_set_priority",
     "search_issues",
+    "set_priority",
     "transition_issue",
     "update_issue",
+    "update_labels",
     "build_jql",
     "rate_limit_check",
     "sanitize",

@@ -45,6 +45,33 @@ def get_issue(key: str, user: str) -> dict:
         return {"key": d["key"], "summary": d["summary"]}
 
 
+def assign_issue(key: str, text: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.post(f"/issues/{key}/assign", json={"text": text})
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "key", endpoint=f"POST /issues/{key}/assign")
+        return {"key": d["key"], "status": "assigned", "assignee": d.get("assignee")}
+
+
+def set_priority(key: str, text: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.post(f"/issues/{key}/priority", json={"text": text})
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "key", "priority", endpoint=f"POST /issues/{key}/priority")
+        return {"key": d["key"], "status": "priority_updated", "priority": d["priority"]}
+
+
+def add_comment(key: str, text: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.post(f"/issues/{key}/comments", json={"text": text})
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "key", "comment", endpoint=f"POST /issues/{key}/comments")
+        return {"key": d["key"], "status": "comment_added"}
+
+
 def search_issues(query: str, user: str) -> dict:
     with _client(user) as c:
         r = c.post("/issues/search", json={"query": query})

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import requests
 
@@ -115,6 +116,35 @@ def log_work(key: str, payload: LogWorkPayload) -> None:
     if payload.started:
         body["started"] = payload.started
     _post_noret(f"/rest/api/2/issue/{key}/worklog", body)
+
+
+def assign_issue(key: str, assignee: Optional[str]) -> None:
+    # Jira Server uses PUT /rest/api/2/issue/{key}/assignee
+    # Pass {"name": username} or {"name": None} to unassign
+    body = {"name": assignee}
+    _put(f"/rest/api/2/issue/{key}/assignee", body)
+
+
+def set_priority(key: str, priority: str) -> None:
+    priority_id = _PRIORITY_IDS.get(priority)
+    if priority_id:
+        fields: dict = {"priority": {"id": priority_id}}
+    else:
+        fields = {"priority": {"name": priority}}
+    _put(f"/rest/api/2/issue/{key}", {"fields": fields})
+
+
+def add_comment(key: str, comment: str) -> None:
+    _post_noret(f"/rest/api/2/issue/{key}/comment", {"body": comment})
+
+
+def get_labels(key: str) -> list[str]:
+    issue = _get(f"/rest/api/2/issue/{key}?fields=labels")
+    return issue["fields"].get("labels", [])
+
+
+def update_labels(key: str, labels: list[str]) -> None:
+    _put(f"/rest/api/2/issue/{key}", {"fields": {"labels": labels}})
 
 
 def search_issues(jql: str, max_results: int) -> list[IssueResult]:

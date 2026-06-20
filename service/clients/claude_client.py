@@ -5,7 +5,7 @@ from pathlib import Path
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
-from ..schemas import JiraIssuePayload, LogWorkPayload, SearchQueryStruct, TransitionPayload, UpdateIssuePayload
+from ..schemas import AddCommentPayload, AssignIssuePayload, JiraIssuePayload, LabelsPayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -87,6 +87,37 @@ def parse_log_work(user_input: str) -> LogWorkPayload:
     prompt = _load_prompt("log_work").format(user_input=safe_input)
     raw = _strip_fences(_call(prompt))
     return LogWorkPayload(**_parse_json(raw, "log_work"))
+
+
+def parse_assign_issue(user_input: str) -> AssignIssuePayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("assign_issue").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return AssignIssuePayload(**_parse_json(raw, "assign_issue"))
+
+
+def parse_set_priority(user_input: str) -> SetPriorityPayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("set_priority").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return SetPriorityPayload(**_parse_json(raw, "set_priority"))
+
+
+def parse_add_comment(user_input: str) -> AddCommentPayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("add_comment").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return AddCommentPayload(**_parse_json(raw, "add_comment"))
+
+
+def parse_labels(user_input: str, current_labels: list[str]) -> LabelsPayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("labels").format(
+        user_input=safe_input,
+        current_labels=json.dumps(current_labels, ensure_ascii=False),
+    )
+    raw = _strip_fences(_call(prompt))
+    return LabelsPayload(**_parse_json(raw, "labels"))
 
 
 def parse_search_query(user_input: str) -> SearchQueryStruct:

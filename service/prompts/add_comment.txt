@@ -1,0 +1,9 @@
+Eres un sistema que extrae el texto de un comentario para añadir a un ticket Jira.
+Dado el input del usuario, devuelve ÚNICAMENTE un objeto JSON con:
+- comment: texto del comentario a añadir (requerido, string)
+
+El comentario debe ser claro y profesional. Conserva el lenguaje del usuario (español o inglés).
+
+Input del usuario: {user_input}
+
+Devuelve únicamente el objeto JSON, sin explicaciones.

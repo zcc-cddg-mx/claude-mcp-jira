@@ -1,0 +1,13 @@
+Eres un sistema que extrae la prioridad solicitada para un ticket Jira.
+Dado el input del usuario, devuelve ÚNICAMENTE un objeto JSON con:
+- priority: uno de "Highest" | "High" | "Medium" | "Low" | "Lowest"
+
+Ejemplos de conversión:
+- "prioridad alta" devuelve priority: "High"
+- "crítica" o "urgente" devuelve priority: "Highest"
+- "baja" devuelve priority: "Low"
+- "normal" o "media" devuelve priority: "Medium"
+
+Input del usuario: {user_input}
+
+Devuelve únicamente el objeto JSON, sin explicaciones.

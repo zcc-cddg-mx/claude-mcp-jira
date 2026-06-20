@@ -1,0 +1,12 @@
+Eres un sistema que extrae el nombre de usuario para asignar un ticket Jira.
+Dado el input del usuario, devuelve ÚNICAMENTE un objeto JSON con:
+- assignee: nombre de usuario Jira (accountId o username, string) o null para desasignar
+
+Ejemplos de conversión:
+- "asigna a carlos.duarte" devuelve assignee: "carlos.duarte"
+- "asignar a mí mismo" devuelve assignee: "currentUser"
+- "desasignar" devuelve assignee: null
+
+Input del usuario: {user_input}
+
+Devuelve únicamente el objeto JSON, sin explicaciones.

@@ -193,6 +193,53 @@ Nuevos endpoints para gestión del ciclo de vida del ticket (2026-06-19):
 
 ---
 
+## Fase 4.4 — Mejoras API (eval-apis-copilot + eval-swagger-copilot) — pendiente
+
+Refinamientos derivados de evaluaciones externas (2026-06-20). Objetivo: alinear el diseño de endpoints con el modelo de **aggregate con commands** de Jira y mejorar la documentación interactiva.
+
+### Principio aplicado
+
+> Un issue en Jira no es un recurso CRUD genérico — es un aggregate con acciones explícitas.  
+> Endpoints específicos por acción → mejor control, mejor auditoría, mejor uso por Claude/MCP.
+
+### Endpoints a añadir (alta prioridad)
+
+| Endpoint | Estado | Descripción |
+|---|---|---|
+| `POST /issues/{key}/comments` | ⬜ Pendiente | Comentario como acción dedicada; actualmente embebido en `PATCH /issues/{key}` |
+| `POST /issues/{key}/assign` | ⬜ Pendiente | Asignación de responsable; texto libre → Claude → Jira `PUT /rest/api/2/issue/{key}/assignee` |
+| `POST /issues/{key}/priority` | ⬜ Pendiente | Cambio de prioridad; texto libre → Claude → ID mapping → Jira PUT |
+
+### Refactores (media prioridad)
+
+| Cambio | Detalle |
+|---|---|
+| Migrar labels de `/actions` a `/issues/{key}/labels` | El eval clasifica labels como endpoint core; `/actions` queda para long-tail |
+| Tipar `/actions` con enum de acciones válidas | Validar `action` antes de llegar a Claude; acciones long-tail: `add_watcher`, `link_issue`, `set_fix_version`, `set_component`, `update_custom_field` |
+
+### Swagger / documentación (alta prioridad)
+
+| Cambio | Detalle |
+|---|---|
+| Deshabilitar `/docs` en producción | `FastAPI(docs_url="/docs" if APP_ENV=="dev" else None)`; nueva var `APP_ENV=dev\|prod` en `.env.example` y `docker-compose.yml` |
+| `example=` en `Field()` de schemas | Mejora UI del `/docs` interactivo; sin impacto funcional |
+
+### Tools MCP a añadir
+
+| Tool | Rol mínimo | Endpoint que llama |
+|---|---|---|
+| `add_comment_jira_issue` | dev | `POST /issues/{key}/comments` |
+| `assign_jira_issue` | lead | `POST /issues/{key}/assign` |
+| `set_priority_jira_issue` | lead | `POST /issues/{key}/priority` |
+
+### Archivos afectados
+- `service/routes/comments.py` + `service/routes/labels.py` + `service/routes/assign.py` + `service/routes/priority.py` (nuevos)
+- `service/routes/actions.py` — pasar a long-tail tipado (enum de acciones)
+- `service/main.py` — `APP_ENV` para condicionar `/docs`
+- `jira_mcp/server.py` — 3 tools nuevas
+
+---
+
 ## Fase 5 — Soporte multi-proyecto: tickets SAZ vinculados a ZNRX (futura)
 
 **Objetivo**: extender el sistema para crear tickets SAZ (*Solicitudes Release Zurich*) vinculados a un ticket ZNRX existente, cubriendo el flujo oficial de solicitudes DevOps dentro de un proyecto.
@@ -286,7 +333,7 @@ claude-mcp-jira/
 ├── service/
 │   ├── main.py                  # FastAPI v0.3.0
 │   ├── audit.py                 # JSON-lines con request_id
-│   ├── routes/                  # issues, update, summarize, search
+│   ├── routes/                  # issues, update, summarize, search, transitions, worklog, actions
 │   ├── schemas/
 │   ├── clients/
 │   │   ├── sanitizer.py         # Sanitización extendida
@@ -294,7 +341,7 @@ claude-mcp-jira/
 │   │   ├── jira_client.py       # PAT Bearer + cert + timeout
 │   │   ├── jql_builder.py       # Claude → struct → JQL seguro
 │   │   └── rate_limiter.py      # Sliding window por usuario
-│   └── prompts/                 # Templates: create, update, summarize, search
+│   └── prompts/                 # Templates: create, update, summarize, search, transition, log_work, labels
 ├── jira_mcp/
 │   ├── server.py                # SSE server — 4 herramientas + audit log
 │   ├── auth.py                  # API key + IP allowlist
@@ -370,4 +417,7 @@ pytest
 | Output MCP | Normalizado (`{key,status}`) | Evitar filtración de datos internos hacia el LLM |
 | Session context | `request_id` UUID (sin estado de sesión completo) | Trazabilidad suficiente; sesiones añaden complejidad innecesaria |
 | Persistencia MCP | Ninguna — stateless | Sin disco, escalable horizontalmente, menor superficie de ataque |
-| Observabilidad | Opcional — Fase 5 | Requiere infra adicional; `request_id` cubre el MVP |
+| Observabilidad | Opcional — Fase 6 | Requiere infra adicional; `request_id` cubre el MVP |
+| Endpoints por acción | Commands explícitos (transition, worklog, labels, …) | Issue Jira = aggregate con commands; endpoints específicos → mejor auditoría y uso por Claude/MCP |
+| `/actions` genérico | Long-tail tipado (enum) | Acciones poco frecuentes sin endpoint propio; tipado previene abuso |
+| Swagger en producción | Deshabilitado (`APP_ENV=prod`) | Evitar exposición de contratos internos; disponible solo en `dev` |

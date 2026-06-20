@@ -10,6 +10,7 @@ services:
     environment:
       - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
       - JIRA_TIMEOUT=30
+      - APP_ENV=prod
     volumes:
       - ./logs:/app/logs
 

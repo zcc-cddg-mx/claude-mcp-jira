@@ -7,7 +7,7 @@ _ISSUE_TYPE_PATTERN = "^(Bug|Task|Story|Improvement)$"
 
 
 class CreateIssueRequest(BaseModel):
-    text: str = Field(..., min_length=5, max_length=2000)
+    text: str = Field(..., min_length=5, max_length=2000, example="bug en el login de producción, prioridad alta")
 
 
 class JiraIssuePayload(BaseModel):
@@ -25,7 +25,7 @@ class CreateIssueResponse(BaseModel):
 
 
 class UpdateIssueRequest(BaseModel):
-    text: str = Field(..., min_length=5, max_length=2000)
+    text: str = Field(..., min_length=5, max_length=2000, example="cambiar prioridad a crítica y añadir comentario de seguimiento")
 
 
 class UpdateIssuePayload(BaseModel):
@@ -46,7 +46,7 @@ class SummarizeIssueResponse(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str = Field(..., min_length=3, max_length=500)
+    query: str = Field(..., min_length=3, max_length=500, example="mis bugs abiertos de esta semana")
 
 
 class SearchQueryStruct(BaseModel):
@@ -72,7 +72,7 @@ class SearchResponse(BaseModel):
 
 
 class TransitionIssueRequest(BaseModel):
-    text: str = Field(..., min_length=3, max_length=2000)
+    text: str = Field(..., min_length=3, max_length=2000, example="pasar a en progreso")
 
 
 class TransitionPayload(BaseModel):
@@ -87,7 +87,7 @@ class TransitionIssueResponse(BaseModel):
 
 
 class LogWorkRequest(BaseModel):
-    text: str = Field(..., min_length=3, max_length=2000)
+    text: str = Field(..., min_length=3, max_length=2000, example="2 horas revisando la arquitectura del módulo de autenticación")
 
 
 class LogWorkPayload(BaseModel):
@@ -100,3 +100,57 @@ class LogWorkResponse(BaseModel):
     key: str
     time_spent_seconds: int
     comment: Optional[str] = None
+
+
+class AddCommentRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000, example="se identificó la causa raíz: falta validación en el token de sesión")
+
+
+class AddCommentPayload(BaseModel):
+    comment: str
+
+
+class AddCommentResponse(BaseModel):
+    key: str
+    comment: str
+
+
+class AssignIssueRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000, example="asigna a carlos.duarte")
+
+
+class AssignIssuePayload(BaseModel):
+    assignee: Optional[str] = None
+
+
+class AssignIssueResponse(BaseModel):
+    key: str
+    assignee: Optional[str] = None
+
+
+class SetPriorityRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000, example="subir prioridad a alta")
+
+
+class SetPriorityPayload(BaseModel):
+    priority: str = Field(..., pattern=_PRIORITY_PATTERN)
+
+
+class SetPriorityResponse(BaseModel):
+    key: str
+    priority: str
+
+
+class ActionsRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000, example="pon los labels: backend, api")
+
+
+class LabelsPayload(BaseModel):
+    operation: str
+    labels: list[str]
+
+
+class ActionsResponse(BaseModel):
+    key: str
+    action: str
+    labels: list[str]

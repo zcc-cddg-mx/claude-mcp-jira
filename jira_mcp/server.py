@@ -107,6 +107,54 @@ def _make_tools() -> list[Tool]:
                 "required": ["query"],
             },
         ),
+        Tool(
+            name="assign_jira_issue",
+            description="Assign a Jira ticket to a user using a plain-text instruction.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language instruction for assignment (e.g. 'assign to carlos.duarte' or 'unassign')",
+                        "maxLength": max_len,
+                    },
+                },
+                "required": ["key", "text"],
+            },
+        ),
+        Tool(
+            name="set_priority_jira_issue",
+            description="Change the priority of a Jira ticket using a plain-text instruction.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language instruction for priority (e.g. 'set priority to high')",
+                        "maxLength": max_len,
+                    },
+                },
+                "required": ["key", "text"],
+            },
+        ),
+        Tool(
+            name="add_comment_jira_issue",
+            description="Add a comment to an existing Jira ticket from a plain-text description.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language description of the comment to add",
+                        "maxLength": max_len,
+                    },
+                },
+                "required": ["key", "text"],
+            },
+        ),
     ]
 
 
@@ -158,6 +206,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.get_issue(arguments["key"], user)
         elif name == "search_jira_issues":
             result = service_client.search_issues(arguments["query"], user)
+        elif name == "assign_jira_issue":
+            result = service_client.assign_issue(arguments["key"], arguments["text"], user)
+        elif name == "set_priority_jira_issue":
+            result = service_client.set_priority(arguments["key"], arguments["text"], user)
+        elif name == "add_comment_jira_issue":
+            result = service_client.add_comment(arguments["key"], arguments["text"], user)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception as e:

@@ -27,8 +27,8 @@ fail() { red "$1"; echo "    $2"; FAIL=$((FAIL+1)); }
 # ── 0. Prerequisitos ─────────────────────────────────────────────────────────
 header "0. Prerequisitos"
 curl -sf "$SERVICE_URL/health" > /dev/null && ok "Service layer activo ($SERVICE_URL)" || { fail "Service layer no responde en $SERVICE_URL" ""; exit 1; }
-mcp_port=$(echo "$MCP_URL" | grep -oE ':[0-9]+$' | tr -d ':')
-ss -tlnp "sport = :$mcp_port" 2>/dev/null | grep -q ":$mcp_port" && ok "MCP server activo ($MCP_URL)" || { fail "MCP server no responde en $MCP_URL" ""; exit 1; }
+mcp_code=$(curl -s -o /dev/null -w "%{http_code}" "$MCP_URL/sse" --max-time 5 2>/dev/null || echo "000")
+[ "$mcp_code" != "000" ] && ok "MCP server activo ($MCP_URL)" || { fail "MCP server no responde en $MCP_URL" ""; exit 1; }
 
 # ── 1. Herramienta create_jira_issue via service_client ──────────────────────
 # Probamos el path completo invocando service_client directamente (mismo código que usa el MCP)

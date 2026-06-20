@@ -35,10 +35,10 @@ cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY and uncomment REQUESTS_CA_
 ## Running
 
 ```bash
-# Full stack (service layer + MCP server)
+# Full stack (service layer + MCP server) — puertos 18000/18001 (igual que dev)
 docker compose up
 
-# Dev mode (no Docker) — puertos 18000/18001 (8000 ocupado por Portainer en dev)
+# Dev mode (no Docker) — puertos 18000/18001 (8000 ocupado por Portainer)
 bash scripts/dev.sh both       # service :18000 + MCP :18001
 bash scripts/dev.sh stop       # detener todo
 bash scripts/dev.sh restart    # reinicio limpio
@@ -72,7 +72,7 @@ Add to `.claude/settings.json`:
 }
 ```
 
-Dev uses port 18001 (8001 in Docker). For internal deployment replace `localhost:18001` with `mcp-jira.internal:8001`.
+Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 inside container). For internal deployment replace `localhost:18001` with `mcp-jira.internal:18001`.
 
 ## Service layer — endpoints
 

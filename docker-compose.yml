@@ -4,9 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "18000:8000"
     env_file:
       - .env
+    environment:
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+      - JIRA_TIMEOUT=30
     volumes:
       - ./logs:/app/logs
 
@@ -15,11 +18,12 @@ services:
       context: .
       dockerfile: jira_mcp/Dockerfile
     ports:
-      - "8001:8001"
+      - "18001:8001"
     env_file:
       - .env
     environment:
       - SERVICE_URL=http://service:8000
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
     volumes:
       - ./logs:/app/logs
     depends_on:

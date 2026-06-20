@@ -128,6 +128,32 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 
 ---
 
+## Fase 4.1 — Ajustes post-validación e2e ✅
+
+Correcciones aplicadas tras pruebas contra `jira.zurich.com` real (2026-06-19):
+
+| Ajuste | Archivo | Detalle |
+|---|---|---|
+| `customfield_25832` obligatorio | `jira_client.py` | "Línea de Servicio" = BAU (id 44461) en todos los issues ZNRX |
+| Priority por ID | `jira_client.py` | ZNRX solo acepta: Highest (1), High (2), Low (4) — no por nombre |
+| Bug issuetype → Task fallback | `jira_client.py` | Validaciones de workflow bloquean Bug vía API en ZNRX |
+| Prompts traducidos al español | `service/prompts/*.txt` | `create_issue`, `update_issue`, `search_issues` |
+| `TICKET_LANG` env var | `claude_client.py` | `es` (default) / `en`; instrucción de idioma añadida al prompt en runtime |
+| `JIRA_TIMEOUT=30` | `.env`, scripts | 10s insuficiente desde WSL; default actualizado |
+| Scripts de desarrollo | `scripts/` | `dev.sh` (stop/restart/status/both) + `test-dev.sh` (kill/reinicio automático) |
+| Documentación proyectos | `docs/jira-projects.md` | Metadata real de ZNRX, AIPROJECTS, SAZ, SCRX desde API Jira |
+
+**Proyectos configurados:**
+
+| Proyecto | `JIRA_PROJECT_KEY` | `TICKET_LANG` | Propósito |
+|---|---|---|---|
+| ZNRX | `ZNRX` | `es` | Gestión de requerimientos y desarrollo |
+| AIPROJECTS | `AIPROJECTS` | `en` | IA y automatización de negocio (internacional) |
+| SAZ | `SAZ` | `es` | Solicitudes Release / DevOps |
+| SCRX | `SCRX` | `es` | Desarrollo ágil Ecuador/LATAM |
+
+---
+
 ## Fase 5 — Soporte multi-proyecto: tickets SAZ vinculados a ZNRX (futura)
 
 **Objetivo**: extender el sistema para crear tickets SAZ (*Solicitudes Release Zurich*) vinculados a un ticket ZNRX existente, cubriendo el flujo oficial de solicitudes DevOps dentro de un proyecto.
@@ -240,6 +266,8 @@ claude-mcp-jira/
 │   ├── service_client.py        # Cliente httpx con output filtrado
 │   ├── Dockerfile
 │   └── README.md
+├── docs/
+│   └── jira-projects.md         # Metadata proyectos: ZNRX, AIPROJECTS, SAZ, SCRX
 ├── certs/                       # Certificados raíz corporativos Zurich
 ├── arch/
 │   ├── design/
@@ -284,7 +312,7 @@ starlette
 | MCP deployment | Servicio Docker interno | Debe vivir en red corporativa para acceder a `jira.zurich.com` |
 | Sanitización | Extendida (tokens, IPs RFC1918, hosts internos, stack traces) | Prevenir fuga de datos hacia Claude API |
 | JQL | Claude → struct → builder controlado | JQL libre puede generar queries destructivas o masivas |
-| Timeout Jira | `JIRA_TIMEOUT=10s` configurable | Evitar bloqueos por Jira lento o caído |
+| Timeout Jira | `JIRA_TIMEOUT=30s` en dev (10s en Docker) | WSL requiere más tiempo; Docker va directo a la red |
 | Trazabilidad | `request_id` UUID por operación | Correlacionar logs entre CLI, service y Jira |
 | Auth MCP | API key + IP allowlist | Expone capacidades críticas; no debe ser acceso abierto |
 | RBAC MCP | dev / lead / system | Principio de menor privilegio por rol |

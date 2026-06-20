@@ -78,6 +78,7 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 | `MCP_PORT` | `8001` | Puerto de escucha |
 | `MCP_SERVICE_TIMEOUT` | `30` | Timeout hacia el service layer (segundos) |
 | `JIRA_MAX_RESULTS` | `50` | Máximo de resultados en búsquedas (hard cap: 50) |
+| `TICKET_LANG` | `es` | Idioma del contenido generado: `es` \| `en` (ver `docs/jira-projects.md`) |
 
 ## RBAC — permisos por rol
 

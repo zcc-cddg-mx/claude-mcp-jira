@@ -6,7 +6,7 @@
 arch/
 ├── design/                     # Diseño y plan de implementación
 │   ├── architecture-overview.md    Arquitectura general (capas, componentes, flujos)
-│   └── implementation-plan.md      Plan de 5 fases con decisiones y criterios de éxito
+│   └── implementation-plan.md      Plan de 6 fases (+ 4.1 ajustes e2e) con decisiones y criterios de éxito
 │
 ├── evaluations/                # Evaluaciones externas del plan
 │   ├── eval-gemini.md              Evaluación y recomendaciones de Gemini
@@ -25,3 +25,4 @@ arch/
 | `design/implementation-plan.md` | Fuente de verdad del plan — decisiones, fases, criterios |
 | `reports/mcp-technical-report.md` | Referencia técnica MCP para auditorías y evaluaciones futuras |
 | `evaluations/eval-plan-copilot-2.md` | Última evaluación — mejoras opcionales adoptadas y elementos diferidos a Fase 5 |
+| `../docs/jira-projects.md` | Metadata real de proyectos: ZNRX, AIPROJECTS, SAZ, SCRX |

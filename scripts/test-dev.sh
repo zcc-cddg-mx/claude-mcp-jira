@@ -137,7 +137,7 @@ assert_http "GET /health" "$SERVICE_URL/health"
 
 # ── 2. Crear ticket (CLI) ────────────────────────────────────────────────────
 header "2. Crear ticket ZNRX desde CLI"
-output=$($CLI create "[TEST] Prueba MCP Claude — validación end-to-end automatizada" 2>&1)
+output=$($CLI create "[MCP Claude Jira Test] validación end-to-end automatizada — ticket de prueba, puede eliminarse" 2>&1)
 echo "$output"
 assert_ok "CLI create — respuesta contiene 'Ticket creado'" "$output" "Ticket creado"
 
@@ -163,7 +163,7 @@ fi
 # ── 4. Update ticket (CLI) ───────────────────────────────────────────────────
 header "4. Actualizar ticket $CREATED_KEY"
 if [ -n "$CREATED_KEY" ]; then
-    output=$($CLI update "$CREATED_KEY" "cambiar prioridad a alta y agregar comentario: actualizado por test-dev.sh" 2>&1)
+    output=$($CLI update "$CREATED_KEY" "cambiar prioridad a alta y agregar comentario: actualizado por MCP Claude Jira Test runner" 2>&1)
     echo "$output"
     assert_ok "CLI update — respuesta contiene el key" "$output" "$CREATED_KEY"
 else

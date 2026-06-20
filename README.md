@@ -79,6 +79,8 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 4.1 — Ajustes e2e + TICKET_LANG | ✅ Completa | Campos ZNRX, priority IDs, prompts ES, idioma configurable |
 | 4.2 — Deuda técnica | ✅ Completa | JQL injection fix, audit MCP, rate limiter compartido, 52 unit tests |
 | 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
+| 4.4 — Mejoras API | ✅ Completa | comments, assign, priority, labels, clone |
+| 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types` (cache TTL 1h) |
 | 5 — Soporte SAZ | Futura | Tickets Solicitudes Release Zurich vinculados a ZNRX |
 | 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 
@@ -89,7 +91,7 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | [`docs/jira-projects.md`](docs/jira-projects.md) | Proyectos Jira — restricciones, issuetypes, `TICKET_LANG` |
 | [`docs/jira-fields.md`](docs/jira-fields.md) | Campos requeridos y valores permitidos por proyecto |
 | [`docs/jira-roles.md`](docs/jira-roles.md) | Permisos efectivos del usuario en los 4 proyectos |
-| [`docs/jira-link-types.md`](docs/jira-link-types.md) | Tipos de link — recomendación SAZ→ZNRX |
+| [`docs/jira-link-types.md`](docs/jira-link-types.md) | Tipos de link — 29 tipos en jira.zurich.com; también disponible vía `GET /issue-link-types` |
 | [`docs/jira-workflows.md`](docs/jira-workflows.md) | Statuses y transiciones por proyecto |
 | [`arch/`](arch/README.md) | Arquitectura, plan de implementación, evaluaciones e informes técnicos |
 | [`jira_mcp/README.md`](jira_mcp/README.md) | Variables de entorno y configuración del MCP server |

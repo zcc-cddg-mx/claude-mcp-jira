@@ -89,8 +89,9 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `POST` | `/issues/{key}/priority` | Cambiar prioridad (texto libre → Claude → priority Jira) |
 | `POST` | `/issues/{key}/labels` | Gestionar labels (SET/ADD/REMOVE desde texto libre) |
 | `POST` | `/issues/{key}/clone` | Clonar ticket (hereda campos; overrides opcionales vía texto) |
-| `POST` | `/issues/{key}/link` | Relacionar tickets (texto libre → Claude → issueLink Jira) |
-| `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, link_issue, etc.) — 501 |
+| `POST` | `/issues/{key}/link` | Relacionar tickets (texto libre → Claude → issueLink Jira; tipos dinámicos) |
+| `GET` | `/issue-link-types` | Lista tipos de link reales de Jira (cache TTL 1h) |
+| `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, etc.) — 501 |
 | `GET` | `/health` | Health check |
 
 ## MCP server — tools
@@ -162,6 +163,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4.1 — Ajustes e2e + TICKET_LANG | ✅ Completa | Campos ZNRX, priority IDs, prompts ES, idioma configurable |
 | 4.2 — Deuda técnica | ✅ Completa | JQL injection fix, audit MCP, rate limiter compartido, 52 unit tests |
 | 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
+| 4.4 — Mejoras API | ✅ Completa | comments, assign, priority, labels, clone; Swagger prod off |
+| 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h |
 | 5 — Soporte SAZ | Futura | Tickets SAZ vinculados a ZNRX — bloqueantes resueltos |
 | 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 

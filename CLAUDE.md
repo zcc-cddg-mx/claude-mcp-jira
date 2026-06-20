@@ -108,7 +108,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 
 `certs/` contains the Zurich root CA files. Set `REQUESTS_CA_BUNDLE` in `.env`:
 
-- `certs/zurichseguros-rootca-until-2031_03_20.crt` — standard internal services
+- `certs/zurichseguros-rootca-until-2031_03_20.crt` — standard internal services (jira.zurich.com)
+- `certs/zurich-ssl-ca.pem` — Zurich SSL inspection CA (ssldecrypt.latam.zurich.com) — required for api-zurich.data-fact.com
 - `certs/cacert-workflow-uat.pem` — UAT workflow endpoints
 - `certs/localCA.crt` — local dev CA
 

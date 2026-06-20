@@ -146,16 +146,19 @@ Tipos de solicitud SAZ habituales:
 - Gestión de repositorios Git (creación, permisos, ramas)
 - Solicitudes de infraestructura (accesos, configs, certificados)
 
-### Restricción de diseño central
+### Relación con ZNRX
 
-El SAZ **no puede existir sin un ZNRX padre**. El sistema debe:
-- Recibir el `znrx_key` como input obligatorio
-- Crear el SAZ en el proyecto SAZ
-- Crear el issue link `SAZ → ZNRX` vía `POST /rest/api/2/issueLink`
+El SAZ es **autónomo** — puede crearse sin ningún ticket ZNRX asociado. Sin embargo, la buena práctica del equipo es vincularlo a un ZNRX existente como documentación y justificación de la solicitud.
+
+El sistema debe soportar ambos casos:
+- SAZ standalone: sin `znrx_key`
+- SAZ vinculado: con `znrx_key` opcional → crea el link `SAZ → ZNRX` vía `POST /rest/api/2/issueLink`
 
 ```
-ZNRX-1234  (proyecto: desarrollo/bugs)
-    └── SAZ-7176  (link type: "relates to" o equivalente en Jira Server)
+SAZ-7176  (standalone — solicitud DevOps sin proyecto asociado)
+
+ZNRX-1234  (proyecto de desarrollo)
+    └── SAZ-7177  (link: "relates to" — justificación/contexto del ZNRX)
 ```
 
 ### Decisiones pendientes (requieren evaluación previa)
@@ -167,6 +170,7 @@ ZNRX-1234  (proyecto: desarrollo/bugs)
 | Campos obligatorios SAZ | Inspeccionar `GET /rest/api/2/issue/createmeta?projectKeys=SAZ` — pueden diferir de ZNRX |
 | Prompt Claude para SAZ | Especializado para lenguaje DevOps → campos SAZ + descripción del vínculo con el ZNRX |
 | RBAC | Crear SAZ requiere rol `lead` o superior (acción con impacto en Release) |
+| `znrx_key` obligatorio vs opcional | Campo opcional — el link solo se crea si se provee |
 
 ### Entregables estimados
 - `service/routes/saz.py` — endpoint `POST /issues/saz` con `znrx_key` requerido
@@ -178,7 +182,13 @@ ZNRX-1234  (proyecto: desarrollo/bugs)
 
 ### Criterio de éxito
 ```bash
-python cli/main.py create-saz ZNRX-1234 "solicitar reinicio del servicio de autenticación en producción"
+# SAZ standalone
+python cli/main.py create-saz "solicitar reinicio del servicio de autenticación en producción"
+# → SAZ-XXXXX creado
+# → output: {"saz_key": "SAZ-XXXXX", "status": "created"}
+
+# SAZ vinculado a ZNRX (buena práctica)
+python cli/main.py create-saz "solicitar reinicio del servicio de autenticación en producción" --znrx ZNRX-1234
 # 1. → SAZ-XXXXX creado en jira.zurich.com/projects/SAZ
 # 2. → issue link SAZ-XXXXX → ZNRX-1234 creado
 # → output: {"saz_key": "SAZ-XXXXX", "znrx_key": "ZNRX-1234", "status": "linked"}

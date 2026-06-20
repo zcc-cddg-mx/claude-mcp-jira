@@ -124,9 +124,16 @@ def parse_add_comment(user_input: str) -> AddCommentPayload:
     return AddCommentPayload(**_parse_json(raw, "add_comment"))
 
 
-def parse_link_issue(user_input: str) -> LinkIssuePayload:
+def parse_link_issue(user_input: str, link_types: list[dict]) -> LinkIssuePayload:
     safe_input = sanitize(user_input)
-    prompt = _load_prompt("link_issue").format(user_input=safe_input)
+    link_types_str = "\n".join(
+        f'- "{t["name"]}" — outward: {t["outward"]} | inward: {t["inward"]}'
+        for t in link_types
+    )
+    prompt = _load_prompt("link_issue").format(
+        user_input=safe_input,
+        link_types=link_types_str,
+    )
     raw = _strip_fences(_call(prompt))
     return LinkIssuePayload(**_parse_json(raw, "link_issue"))
 

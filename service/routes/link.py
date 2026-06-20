@@ -1,11 +1,21 @@
 from fastapi import APIRouter, Header, HTTPException
+from typing import List
 
 from ..audit import log, new_request_id
-from ..clients import link_issue, parse_link_issue, rate_limit_check
+from ..clients import get_link_types, link_issue, parse_link_issue, rate_limit_check
 from ..clients.sanitizer import sanitize
-from ..schemas import LinkIssueRequest, LinkIssueResponse
+from ..schemas import LinkIssueRequest, LinkIssueResponse, LinkTypeItem
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+meta_router = APIRouter(tags=["meta"])
+
+
+@meta_router.get("/issue-link-types", response_model=List[LinkTypeItem])
+async def list_link_types():
+    try:
+        return get_link_types()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Jira request failed: {sanitize(str(e))}")
 
 
 @router.post("/{key}/link", response_model=LinkIssueResponse)
@@ -22,14 +32,19 @@ async def link_issue_endpoint(
         raise HTTPException(status_code=429, detail=str(e))
 
     try:
-        payload = parse_link_issue(body.text)
+        link_types = get_link_types()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Jira request failed: {sanitize(str(e))}")
+
+    try:
+        payload = parse_link_issue(body.text, link_types)
     except Exception as e:
         log(request_id=rid, user=x_user, action="link_issue", input_text=body.text,
             jira_key=key, status="error", error=f"claude: {e}")
         raise HTTPException(status_code=422, detail=f"Claude parsing failed: {sanitize(str(e))}")
 
     try:
-        link_issue(key, payload.target_key, payload.link_type_id, payload.source_is_outward)
+        link_issue(key, payload.target_key, payload.link_type_name, payload.source_is_outward)
     except Exception as e:
         log(request_id=rid, user=x_user, action="link_issue", input_text=body.text,
             claude_payload=payload.model_dump(), jira_key=key, status="error", error=f"jira: {e}")
@@ -47,5 +62,5 @@ async def link_issue_endpoint(
     return LinkIssueResponse(
         source_key=key,
         target_key=payload.target_key,
-        link_type_id=payload.link_type_id,
+        link_type_name=payload.link_type_name,
     )

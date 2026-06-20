@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Optional
 
 import requests
@@ -158,16 +159,34 @@ def clone_issue(source_key: str, source: dict, payload) -> str:
     return new_key
 
 
-def link_issue(source_key: str, target_key: str, link_type_id: str, source_is_outward: bool) -> None:
+_link_types_cache: list[dict] = []
+_link_types_cache_ts: float = 0.0
+_LINK_TYPES_TTL = 3600
+
+
+def get_link_types() -> list[dict]:
+    global _link_types_cache, _link_types_cache_ts
+    if _link_types_cache and (time.time() - _link_types_cache_ts) < _LINK_TYPES_TTL:
+        return _link_types_cache
+    data = _get("/rest/api/2/issueLinkType")
+    _link_types_cache = [
+        {"id": t["id"], "name": t["name"], "outward": t["outward"], "inward": t["inward"]}
+        for t in data.get("issueLinkTypes", [])
+    ]
+    _link_types_cache_ts = time.time()
+    return _link_types_cache
+
+
+def link_issue(source_key: str, target_key: str, link_type_name: str, source_is_outward: bool) -> None:
     if source_is_outward:
         body = {
-            "type": {"id": link_type_id},
+            "type": {"name": link_type_name},
             "outwardIssue": {"key": source_key},
             "inwardIssue": {"key": target_key},
         }
     else:
         body = {
-            "type": {"id": link_type_id},
+            "type": {"name": link_type_name},
             "outwardIssue": {"key": target_key},
             "inwardIssue": {"key": source_key},
         }

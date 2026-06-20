@@ -160,16 +160,23 @@ class LinkIssueRequest(BaseModel):
     text: str = Field(..., min_length=5, max_length=2000, example="relacionar con ZNRX-68147, la 68128 depende de la 68147")
 
 
+class LinkTypeItem(BaseModel):
+    id: str
+    name: str
+    outward: str
+    inward: str
+
+
 class LinkIssuePayload(BaseModel):
     target_key: str
-    link_type_id: str
+    link_type_name: str
     source_is_outward: bool
 
 
 class LinkIssueResponse(BaseModel):
     source_key: str
     target_key: str
-    link_type_id: str
+    link_type_name: str
 
 
 class ActionsRequest(BaseModel):

@@ -1,13 +1,19 @@
 import json
 import os
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 _LOG_PATH = Path(os.environ.get("AUDIT_LOG_PATH", "audit.log"))
 
 
+def new_request_id() -> str:
+    return str(uuid.uuid4())
+
+
 def log(
     *,
+    request_id: str,
     user: str,
     action: str,
     input_text: str,
@@ -17,6 +23,7 @@ def log(
     error: str | None = None,
 ) -> None:
     entry = {
+        "request_id": request_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "user": user,
         "action": action,

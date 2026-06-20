@@ -16,6 +16,9 @@ _HEADERS = {
 }
 
 
+_TIMEOUT = int(os.environ.get("JIRA_TIMEOUT", "10"))
+
+
 def create_issue(payload: JiraIssuePayload) -> str:
     url = f"{_JIRA_URL}/rest/api/2/issue"
     body = {
@@ -27,6 +30,8 @@ def create_issue(payload: JiraIssuePayload) -> str:
             "priority": {"name": payload.priority},
         }
     }
-    response = requests.post(url, json=body, headers=_HEADERS, verify=_CA_BUNDLE)
+    response = requests.post(
+        url, json=body, headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT
+    )
     response.raise_for_status()
     return response.json()["key"]

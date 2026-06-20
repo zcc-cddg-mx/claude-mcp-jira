@@ -20,7 +20,7 @@ Claude API accedida vía proxy LiteLLM interno de Zurich.
 - Auth: `Authorization: Bearer <PAT>` (no Basic Auth)
 - API: `/rest/api/2/` (no v3)
 - Descripción: texto plano (no ADF/JSON doc)
-- SSL: `REQUESTS_CA_BUNDLE` apunta a `firewall_root.pem`
+- SSL: `REQUESTS_CA_BUNDLE` apunta a cert corporativo en `certs/`
 
 ### Criterio de éxito
 ```bash
@@ -30,41 +30,36 @@ python cli/main.py create "bug login en producción prioridad alta"
 
 ---
 
-## Fase 2 — Service Layer (FastAPI) + Seguridad
+## Fase 2 — Service Layer (FastAPI) + Seguridad ✅
 
-**Objetivo**: desacoplar CLI de las APIs externas. Introducir sanitización de prompts, validación y auditoría (recomendación Copilot).
+**Objetivo**: desacoplar CLI de las APIs externas. Sanitización, validación, trazabilidad y timeouts.
 
 ### Entregables
-- Servicio FastAPI en `service/`
-- CLI actualizada — llama solo al service layer
-- Schemas Pydantic para request/response
-- `sanitize_prompt()` antes de cada llamada a Claude
-- Audit log: quién ejecutó qué, qué respondió Claude, qué se ejecutó en Jira
+- `service/` — FastAPI con `POST /issues` y `GET /health`
+- `service/clients/sanitizer.py` — elimina secrets antes de enviar a Claude
+- `service/audit.py` — audit log JSON-lines con `request_id` para trazabilidad completa
+- `service/clients/jira_client.py` — timeout configurable vía `JIRA_TIMEOUT`
+- CLI simplificada a cliente HTTP del service layer
+- `Dockerfile` + `docker-compose.yml`
 
-### Tareas
-1. Crear estructura `service/main.py`, `service/routes/`, `service/schemas/`, `service/clients/`
-2. Implementar `POST /issues` — recibe texto libre, sanitiza, llama a Claude, llama a Jira
-3. Implementar `clients/claude.py` con prompt templates en `service/prompts/`
-4. Implementar `clients/jira.py` con auth PAT Bearer y certificado corporativo
-5. Definir schemas Pydantic: `CreateIssueRequest`, `JiraIssuePayload`, `CreateIssueResponse`
-6. Implementar `sanitize_prompt()`: elimina patrones de secrets (tokens, passwords, IPs internas) antes de enviar a Claude
-7. Agregar audit log estructurado (JSON lines): `timestamp`, `user`, `input`, `claude_response`, `jira_key`, `status`
-8. Actualizar CLI: solo hace HTTP a `http://localhost:8000`
-9. Dockerizar (`Dockerfile` + `docker-compose.yml`)
+### Seguridad implementada
+- **Sanitización extendida**: Bearer tokens, passwords, emails, IPs privadas RFC 1918 (`10.x`, `172.16-31.x`, `192.168.x`), hostnames internos (`*.zurich.com`, `*.internal`, `*.local`), stack traces
+- **Audit log**: `request_id` (UUID), `timestamp`, `user`, `action`, `input`, `claude_payload`, `jira_key`, `status`, `error`
+- **Timeout Jira**: `JIRA_TIMEOUT=10` (segundos), configurable en `.env`
 
 ### Criterio de éxito
 ```bash
 docker compose up
 python cli/main.py create "bug login en producción"
 # → CLI → FastAPI → sanitize → Claude → Jira → PROJ-002
-# → audit.log registra la operación completa
+# → audit.log: {"request_id": "uuid", "jira_key": "PROJ-002", "status": "ok", ...}
 ```
 
 ---
 
-## Fase 3 — Comandos completos + clasificación de intención
+## Fase 3 — Comandos completos + JQL controlado
 
-**Objetivo**: soporte para los 4 comandos CLI con clasificación automática de intención.
+**Objetivo**: soporte para los 4 comandos CLI con clasificación de intención y queries JQL seguras.
 
 ### Entregables
 - Dispatcher de intención en el service layer
@@ -75,10 +70,25 @@ python cli/main.py create "bug login en producción"
 1. Implementar clasificador de intención: texto → `{intent, params}`
 2. Agregar `PATCH /issues/{key}` — actualiza summary/description/status vía transiciones Jira v2
 3. Agregar `GET /issues/{key}/summary` — Claude genera resumen legible
-4. Agregar `GET /issues?query=<texto>` — traduce texto a JQL y llama `/rest/api/2/search`
+4. Agregar `GET /issues?query=<texto>` con JQL controlado (ver abajo)
 5. Prompt templates separados por operación en `service/prompts/`
 6. Validar output de Claude con Pydantic antes de llamar a Jira
-7. Rate limiting en FastAPI
+7. Rate limiting en FastAPI + quotas por usuario
+
+### JQL controlado (riesgo mitigado)
+Claude **no genera JQL directamente**. En su lugar:
+- Claude genera un objeto estructurado: `{"assignee": "me", "status": "open", "date_range": "last_week"}`
+- El service layer construye el JQL seguro a partir de ese objeto
+- `MAX_RESULTS = 50` fijo en todas las queries
+- `ALLOWED_FIELDS` lista blanca de campos permitidos en filtros
+
+```python
+# Claude → struct → builder JQL controlado
+struct = claude_parse_query("mis bugs abiertos de esta semana")
+# → {"assignee": "currentUser()", "issuetype": "Bug", "status": "Open", "date_range": "last_week"}
+jql = build_jql(struct, max_results=50)
+# → "assignee = currentUser() AND issuetype = Bug AND status = Open AND created >= -7d ORDER BY created DESC"
+```
 
 ### Criterio de éxito
 ```bash
@@ -89,39 +99,70 @@ python cli/main.py list "mis bugs abiertos de esta semana"
 
 ---
 
-## Fase 4 — MCP Server (servicio deployable interno)
+## Fase 4 — MCP Server (servicio deployable interno) + Auth + RBAC
 
-**Objetivo**: exponer la integración como MCP server desplegable en red interna — no como script local del usuario (recomendación Copilot: el MCP server debe vivir dentro de la red corporativa).
+**Objetivo**: exponer la integración como MCP server desplegable en red interna con autenticación y control de acceso por rol.
 
 ### Entregables
-- MCP server en `mcp/server.py` usando SDK `mcp`
-- Herramientas: `create_jira_issue`, `update_jira_issue`, `search_jira_issues`, `get_jira_issue`
-- Dockerfile propio para `mcp/` — desplegable como servicio independiente
-- Configuración lista para `.claude/settings.json` apuntando al servicio interno
+- `mcp/server.py` — SDK `mcp`, 4 herramientas, delega al service layer
+- Auth MCP: API key interna + IP allowlist
+- RBAC básico: `dev` (crear/comentar), `lead` (actualizar/priorizar), `system` (todo)
+- `mcp/Dockerfile` — imagen deployable en red interna
+- Configuración para `.claude/settings.json`
+- (Opcional) Policy Engine: aprobación humana para acciones críticas
 
 ### Tareas
 1. Instalar SDK MCP (`pip install mcp`)
-2. Crear `mcp/server.py` con las 4 herramientas como `@tool` handlers
-3. Cada herramienta MCP delega al service layer FastAPI (no duplicar lógica)
-4. Schemas de input claros para que Claude pueda invocarlas sin ambigüedad
-5. `mcp/Dockerfile` — imagen deployable en red interna
-6. Documentar en `mcp/README.md` la configuración SSE interna:
-   ```json
-   {
-     "mcpServers": {
-       "jira": {
-         "type": "sse",
-         "url": "http://mcp-jira.internal/sse"
-       }
-     }
-   }
-   ```
-7. Prueba de integración: Claude Code invoca `create_jira_issue` desde una conversación
+2. Crear `mcp/server.py` con herramientas: `create_jira_issue`, `update_jira_issue`, `search_jira_issues`, `get_jira_issue`
+3. Cada herramienta delega al service layer FastAPI (no duplicar lógica)
+4. Middleware de autenticación: `X-API-Key` header + lista de IPs permitidas
+5. Middleware RBAC: mapeo `user → rol → acciones permitidas`
+6. `mcp/Dockerfile` — servicio independiente deployable
+7. (Opcional) Policy Engine: `enforce_policy()` — si `priority == Critical` o acción destructiva → `require_approval()`
+8. Documentar configuración SSE interna en `mcp/README.md`
+
+### Auth MCP
+```python
+# API key interna — nunca expuesta fuera de la red
+X-API-Key: <clave-interna>
+
+# IP allowlist — solo hosts de la red Zurich
+ALLOWED_IPS = ["10.0.0.0/8", "192.168.0.0/16"]
+```
+
+### RBAC
+```python
+ROLES = {
+    "dev":    ["create_issue", "get_issue", "search_issues"],
+    "lead":   ["create_issue", "update_issue", "get_issue", "search_issues"],
+    "system": ["create_issue", "update_issue", "get_issue", "search_issues"],
+}
+```
+
+### Policy Engine (opcional)
+```python
+def enforce_policy(action):
+    if action.type == "update" and action.priority == "Critical":
+        require_approval()   # notifica al lead antes de ejecutar
+```
+
+### Configuración `.claude/settings.json`
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "type": "sse",
+      "url": "http://mcp-jira.internal/sse",
+      "headers": { "X-API-Key": "<clave-interna>" }
+    }
+  }
+}
+```
 
 ### Criterio de éxito
 ```
 Claude Code: "crea un ticket para el bug que encontramos en auth"
-→ Claude invoca create_jira_issue (MCP interno) → PROJ-003 creado en jira.zurich.com
+→ Claude invoca create_jira_issue (MCP interno, auth OK) → PROJ-003 creado
 ```
 
 ---
@@ -131,24 +172,24 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 ```
 claude-mcp-jira/
 ├── cli/
-│   └── main.py                  # Typer CLI
+│   └── main.py                  # Typer CLI — cliente HTTP del service layer
 ├── service/
 │   ├── main.py                  # FastAPI app
+│   ├── audit.py                 # JSON-lines con request_id
 │   ├── routes/
 │   ├── schemas/
 │   ├── clients/
-│   │   ├── claude.py
-│   │   └── jira.py              # Auth PAT Bearer + cert corporativo
-│   └── prompts/                 # Prompt templates por operación
+│   │   ├── sanitizer.py         # Sanitización extendida
+│   │   ├── claude_client.py
+│   │   └── jira_client.py       # PAT Bearer + cert + timeout
+│   └── prompts/                 # Templates por operación
 ├── mcp/
-│   ├── server.py                # MCP server (delega a service layer)
+│   ├── server.py                # MCP server con auth + RBAC
 │   ├── Dockerfile
 │   └── README.md
+├── certs/                       # Certificados raíz corporativos Zurich
 ├── arch/
-│   ├── general.md
-│   ├── recomendations.gemini.md
-│   ├── recomendations.copilot.md
-│   └── implementation-plan.md
+├── Dockerfile                   # Service layer
 ├── docker-compose.yml
 ├── environment.yml
 ├── .env.example
@@ -163,7 +204,7 @@ claude-mcp-jira/
 anthropic
 mcp
 fastapi
-uvicorn
+uvicorn[standard]
 httpx
 requests
 typer
@@ -184,4 +225,9 @@ python-dotenv
 | Descripción tickets | Texto plano | Jira Server no acepta ADF (Atlassian Document Format) |
 | SSL | `REQUESTS_CA_BUNDLE` | Certificado raíz corporativo del firewall de Zurich |
 | MCP deployment | Servicio Docker interno | Debe vivir en red corporativa para acceder a `jira.zurich.com` |
-| Sanitización | Antes de llamar a Claude | Prevenir fuga de datos sensibles hacia la API de Claude |
+| Sanitización | Extendida (tokens, IPs RFC1918, hosts internos, stack traces) | Prevenir fuga de datos hacia Claude API |
+| JQL | Claude → struct → builder controlado | JQL libre puede generar queries destructivas o masivas |
+| Timeout Jira | `JIRA_TIMEOUT=10s` configurable | Evitar bloqueos por Jira lento o caído |
+| Trazabilidad | `request_id` UUID por operación | Correlacionar logs entre CLI, service y Jira |
+| Auth MCP | API key + IP allowlist | Expone capacidades críticas; no debe ser acceso abierto |
+| RBAC MCP | dev / lead / system | Principio de menor privilegio por rol |

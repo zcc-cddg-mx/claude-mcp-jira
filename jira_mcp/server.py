@@ -155,6 +155,22 @@ def _make_tools() -> list[Tool]:
                 "required": ["key", "text"],
             },
         ),
+        Tool(
+            name="link_jira_issues",
+            description="Link two Jira tickets expressing a dependency or relationship (blocks, relates, depends on, duplicates, etc.).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key of the source ticket (e.g. PROJ-123)"},
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language description of the link (e.g. 'link with ZNRX-456, this ticket depends on it')",
+                        "maxLength": max_len,
+                    },
+                },
+                "required": ["key", "text"],
+            },
+        ),
     ]
 
 
@@ -212,6 +228,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.set_priority(arguments["key"], arguments["text"], user)
         elif name == "add_comment_jira_issue":
             result = service_client.add_comment(arguments["key"], arguments["text"], user)
+        elif name == "link_jira_issues":
+            result = service_client.link_issues(arguments["key"], arguments["text"], user)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception as e:

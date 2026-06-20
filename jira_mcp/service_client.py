@@ -72,6 +72,15 @@ def add_comment(key: str, text: str, user: str) -> dict:
         return {"key": d["key"], "status": "comment_added"}
 
 
+def link_issues(key: str, text: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.post(f"/issues/{key}/link", json={"text": text})
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "source_key", "target_key", endpoint=f"POST /issues/{key}/link")
+        return {"source_key": d["source_key"], "target_key": d["target_key"], "status": "linked"}
+
+
 def search_issues(query: str, user: str) -> dict:
     with _client(user) as c:
         r = c.post("/issues/search", json={"query": query})

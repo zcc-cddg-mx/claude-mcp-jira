@@ -156,6 +156,22 @@ class CloneIssueResponse(BaseModel):
     summary: str
 
 
+class LinkIssueRequest(BaseModel):
+    text: str = Field(..., min_length=5, max_length=2000, example="relacionar con ZNRX-68147, la 68128 depende de la 68147")
+
+
+class LinkIssuePayload(BaseModel):
+    target_key: str
+    link_type_id: str
+    source_is_outward: bool
+
+
+class LinkIssueResponse(BaseModel):
+    source_key: str
+    target_key: str
+    link_type_id: str
+
+
 class ActionsRequest(BaseModel):
     text: str = Field(..., min_length=3, max_length=2000, example="pon los labels: backend, api")
 

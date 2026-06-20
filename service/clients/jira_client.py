@@ -158,6 +158,22 @@ def clone_issue(source_key: str, source: dict, payload) -> str:
     return new_key
 
 
+def link_issue(source_key: str, target_key: str, link_type_id: str, source_is_outward: bool) -> None:
+    if source_is_outward:
+        body = {
+            "type": {"id": link_type_id},
+            "outwardIssue": {"key": source_key},
+            "inwardIssue": {"key": target_key},
+        }
+    else:
+        body = {
+            "type": {"id": link_type_id},
+            "outwardIssue": {"key": target_key},
+            "inwardIssue": {"key": source_key},
+        }
+    _post_noret("/rest/api/2/issueLink", body)
+
+
 def assign_issue(key: str, assignee: Optional[str]) -> None:
     # Jira Server uses PUT /rest/api/2/issue/{key}/assignee
     # Pass {"name": username} or {"name": None} to unassign

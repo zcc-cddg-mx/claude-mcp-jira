@@ -193,7 +193,7 @@ Nuevos endpoints para gestión del ciclo de vida del ticket (2026-06-19):
 
 ---
 
-## Fase 4.4 — Mejoras API (eval-apis-copilot + eval-swagger-copilot) — pendiente
+## Fase 4.4 — Mejoras API (eval-apis-copilot + eval-swagger-copilot) ✅
 
 Refinamientos derivados de evaluaciones externas (2026-06-20). Objetivo: alinear el diseño de endpoints con el modelo de **aggregate con commands** de Jira y mejorar la documentación interactiva.
 
@@ -237,6 +237,55 @@ Refinamientos derivados de evaluaciones externas (2026-06-20). Objetivo: alinear
 - `service/routes/actions.py` — pasar a long-tail tipado (enum de acciones)
 - `service/main.py` — `APP_ENV` para condicionar `/docs`
 - `jira_mcp/server.py` — 3 tools nuevas
+
+### Completado también en 4.4
+- `POST /issues/{key}/clone` — clonación de tickets con overrides opcionales vía texto libre
+  - Subtasks ZNRX (`Subtarea Historia`): omite `customfield_25832` y `priority` (no en su screen)
+  - Link tipo Cloners (id=10001) en issues top-level
+
+---
+
+## Fase 4.5 — Link entre tickets ✅
+
+**Objetivo**: permitir relacionar dos tickets Jira con cualquier tipo de link desde texto libre.
+
+### Endpoint
+```
+POST /issues/{key}/link
+{"text": "relacionar con ZNRX-68147. Este ticket requiere de la 68147."}
+→ {"source_key": "ZNRX-68128", "target_key": "ZNRX-68147", "link_type_id": "10500"}
+```
+
+### Flujo
+```
+texto libre → Claude → LinkIssuePayload {target_key, link_type_id, source_is_outward}
+→ POST /rest/api/2/issueLink (Jira)
+```
+
+`source_is_outward` controla la dirección: si es `true`, la fuente realiza la acción (outward); si es `false`, la recibe (inward).
+
+### Tipos de link soportados (prompt + docs/jira-link-types.md)
+| ID | Tipo | Uso típico |
+|---|---|---|
+| 10000 | Blocks | Este ticket bloquea / es bloqueado por otro |
+| 10002 | Duplicate | Ticket duplicado |
+| 10003 | Relates | Relación genérica |
+| 10400 | Inclusion | Epic incluye story |
+| 10401 | Dependency | Depende de / tiene dependencia |
+| 10500 | Requirement | Requiere / es requerido por |
+
+### MCP tool
+- `link_jira_issues` — rol mínimo: `dev`
+
+### Archivos creados/modificados
+- `service/prompts/link_issue.txt` (nuevo)
+- `service/routes/link.py` (nuevo)
+- `service/schemas/issue.py` — `LinkIssueRequest/Payload/Response`
+- `service/clients/jira_client.py` — `link_issue()`
+- `service/clients/claude_client.py` — `parse_link_issue()`
+- `jira_mcp/server.py` — tool `link_jira_issues`
+- `jira_mcp/service_client.py` — `link_issues()`
+- `jira_mcp/rbac.py` — `link_jira_issues` a rol `dev`
 
 ---
 

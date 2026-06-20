@@ -5,7 +5,7 @@ from pathlib import Path
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
-from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
+from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LinkIssuePayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -122,6 +122,13 @@ def parse_add_comment(user_input: str) -> AddCommentPayload:
     prompt = _load_prompt("add_comment").format(user_input=safe_input)
     raw = _strip_fences(_call(prompt))
     return AddCommentPayload(**_parse_json(raw, "add_comment"))
+
+
+def parse_link_issue(user_input: str) -> LinkIssuePayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("link_issue").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return LinkIssuePayload(**_parse_json(raw, "link_issue"))
 
 
 def parse_labels(user_input: str, current_labels: list[str]) -> LabelsPayload:

@@ -84,6 +84,13 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50) |
 | `POST` | `/issues/{key}/transition` | Cambiar estado (texto libre → Claude → transición Jira) |
 | `POST` | `/issues/{key}/worklog` | Registrar horas trabajadas (texto libre → Claude → worklog) |
+| `POST` | `/issues/{key}/comments` | Añadir comentario (texto libre → Claude → comentario Jira) |
+| `POST` | `/issues/{key}/assign` | Asignar ticket (texto libre → Claude → assignee Jira) |
+| `POST` | `/issues/{key}/priority` | Cambiar prioridad (texto libre → Claude → priority Jira) |
+| `POST` | `/issues/{key}/labels` | Gestionar labels (SET/ADD/REMOVE desde texto libre) |
+| `POST` | `/issues/{key}/clone` | Clonar ticket (hereda campos; overrides opcionales vía texto) |
+| `POST` | `/issues/{key}/link` | Relacionar tickets (texto libre → Claude → issueLink Jira) |
+| `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, link_issue, etc.) — 501 |
 | `GET` | `/health` | Health check |
 
 ## MCP server — tools
@@ -94,6 +101,10 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `update_jira_issue` | lead | Actualiza ticket desde texto |
 | `get_jira_issue` | dev | Resumen de ticket |
 | `search_jira_issues` | dev | Búsqueda NL (máx. 50) |
+| `add_comment_jira_issue` | dev | Añade comentario a un ticket |
+| `link_jira_issues` | dev | Relaciona dos tickets (depends on, blocks, relates, etc.) |
+| `assign_jira_issue` | lead | Asigna un ticket a un usuario |
+| `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
 
 ## Security layers
 

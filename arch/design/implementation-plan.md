@@ -361,6 +361,44 @@ python cli/main.py create-saz "solicitar reinicio del servicio de autenticación
 
 ## Fase 6 — Observabilidad + Caching (opcional / futura)
 
+---
+
+## Fase 7 — Multi-proyecto (futura — pendiente evaluación)
+
+> Ver evaluación completa en `arch/evaluations/eval-multiproject-copilot.md` antes de implementar.
+
+**Objetivo**: extender el service layer para operar contra múltiples proyectos Jira simultáneamente, con configuración por proyecto y routing automático.
+
+### Motivación
+Actualmente `JIRA_PROJECT_KEY` es una variable de entorno global — todo el sistema apunta a un único proyecto. La evaluación propone un modelo donde el usuario o Claude determina el proyecto destino dinámicamente según el contexto.
+
+### Líneas a evaluar
+- Selección dinámica de proyecto (por texto libre, por usuario, por contexto)
+- Configuración por proyecto: `TICKET_LANG`, campos requeridos, fallbacks de issuetype
+- Impacto en prompts Claude — instrucciones por proyecto vs. prompt global
+- Alineación con Fase 5 (SAZ) que ya introduce un segundo proyecto
+
+---
+
+## Fase 8 — Interfaz UI (futura — pendiente evaluación)
+
+> Ver evaluación completa en `arch/evaluations/eval-ui-copilot.md` antes de implementar.
+
+**Objetivo**: complementar el acceso CLI/MCP con una interfaz web ligera para usuarios no técnicos.
+
+### Motivación
+El acceso actual vía Claude Code o CLI requiere conocimiento técnico. Una UI permitiría que PMs, analistas y otros stakeholders gestionen tickets Jira con lenguaje natural sin configurar entornos.
+
+### Líneas a evaluar
+- Stack tecnológico (htmx+FastAPI vs. React standalone vs. extensión VS Code)
+- Alcance: ¿read-only (consulta/resumen) o también write (crear/actualizar)?
+- Auth de usuario en UI vs. API key de servicio
+- Alineación con el service layer existente — la UI consumiría los mismos endpoints
+
+---
+
+## Fase 6 — Observabilidad + Caching (opcional / futura)
+
 **Objetivo**: llevar el sistema a producción top-tier con métricas, trazas distribuidas y reducción de carga en Jira.
 
 > No bloqueante para producción. Activar cuando el volumen lo justifique.

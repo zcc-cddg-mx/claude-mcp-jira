@@ -8,7 +8,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./audit.log:/app/audit.log
+      - audit_log:/app
 
   mcp:
     build:
@@ -22,3 +22,6 @@ services:
       - SERVICE_URL=http://service:8000
     depends_on:
       - service
+
+volumes:
+  audit_log:

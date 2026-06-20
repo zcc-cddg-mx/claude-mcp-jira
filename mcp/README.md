@@ -1,0 +1,92 @@
+# MCP Server — claude-mcp-jira
+
+MCP server interno que expone las operaciones Jira como herramientas para Claude Code.
+Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la lógica al service layer FastAPI.
+
+## Herramientas disponibles
+
+| Herramienta | Descripción |
+|---|---|
+| `create_jira_issue` | Crea un ticket desde texto libre |
+| `update_jira_issue` | Actualiza un ticket desde texto libre |
+| `get_jira_issue` | Obtiene resumen de un ticket |
+| `search_jira_issues` | Búsqueda en lenguaje natural (máx. 50 resultados) |
+
+## Seguridad
+
+- **API key**: header `X-API-Key` requerido (`MCP_API_KEY` en `.env`)
+- **IP allowlist**: `MCP_ALLOWED_CIDRS` — solo hosts de la red Zurich
+- **RBAC**: roles `dev` / `lead` / `system` mapeados por API key (`MCP_KEY_ROLES`)
+- **Pre-validación**: input vacío o >2000 caracteres rechazado antes de llamar al backend
+- **Rate limiting**: `MCP_RATE_LIMIT_MAX_CALLS` por API key (independiente del service layer)
+- **Output normalizado**: Claude solo recibe `{key, status}` o `{key, summary}` — nunca payloads internos completos
+
+## Levantar con Docker Compose
+
+```bash
+docker compose up
+```
+
+El MCP server queda disponible en `http://localhost:8001/sse`.
+
+## Configurar en Claude Code
+
+Agregar a `.claude/settings.json` o `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse",
+      "headers": {
+        "X-API-Key": "<MCP_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+Para despliegue interno, reemplazar `localhost:8001` por el hostname del servidor:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "type": "sse",
+      "url": "http://mcp-jira.internal:8001/sse",
+      "headers": {
+        "X-API-Key": "<MCP_API_KEY>"
+      }
+    }
+  }
+}
+```
+
+## Variables de entorno
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `SERVICE_URL` | `http://service:8000` | URL del service layer |
+| `MCP_API_KEY` | `` | API key requerida (vacío = sin auth, solo dev) |
+| `MCP_ALLOWED_CIDRS` | `10.0.0.0/8,192.168.0.0/16` | CIDRs permitidos |
+| `MCP_KEY_ROLES` | `` | Mapeo `key:role` separado por comas |
+| `MCP_DEFAULT_ROLE` | `dev` | Rol cuando no hay mapeo |
+| `MCP_RATE_LIMIT_MAX_CALLS` | `10` | Llamadas máximas por ventana |
+| `MCP_RATE_LIMIT_WINDOW` | `60` | Ventana en segundos |
+| `MCP_PORT` | `8001` | Puerto de escucha |
+| `MCP_SERVICE_TIMEOUT` | `30` | Timeout hacia el service layer (segundos) |
+
+## RBAC — permisos por rol
+
+| Rol | Herramientas permitidas |
+|---|---|
+| `dev` | `create`, `get`, `search` |
+| `lead` | `create`, `update`, `get`, `search` |
+| `system` | todas |
+
+Ejemplo de configuración con múltiples claves:
+
+```
+MCP_KEY_ROLES=key-dev-1:dev,key-lead-1:lead,key-system:system
+```

@@ -1,9 +1,24 @@
 services:
   service:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
       - .env
     volumes:
       - ./audit.log:/app/audit.log
+
+  mcp:
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - SERVICE_URL=http://service:8000
+    depends_on:
+      - service

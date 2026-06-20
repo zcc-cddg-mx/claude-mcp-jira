@@ -14,3 +14,5 @@ dependencies:
       - typer
       - pydantic
       - python-dotenv
+      - "mcp[cli]"
+      - starlette

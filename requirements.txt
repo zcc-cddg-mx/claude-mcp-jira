@@ -6,3 +6,5 @@ requests
 typer
 pydantic
 python-dotenv
+mcp[cli]
+starlette

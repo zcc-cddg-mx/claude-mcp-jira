@@ -6,8 +6,8 @@
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/_conda_env.sh
 source "$(dirname "$0")/_conda_env.sh"
-SERVICE_PORT=18000
-SERVICE_URL="http://localhost:$SERVICE_PORT"
+SERVICE_PORT="${MCP_SERVICE_PORT:-18000}"
+SERVICE_URL="${MCP_SERVICE_BASE_URL:-http://localhost:$SERVICE_PORT}"
 PIDFILE=/tmp/mcp-jira-service.pid
 LOG_SERVICE=/tmp/mcp-jira-service.log
 CLI="$PYTHON $REPO_DIR/cli/main.py"

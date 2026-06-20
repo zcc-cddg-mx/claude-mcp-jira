@@ -10,6 +10,7 @@ _write_test_log() {
     local pass="$2"
     local fail="$3"
     local ticket="${4:-}"
+    local env="${MCP_TEST_ENV:-dev}"
 
     local repo_dir
     repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,7 +32,7 @@ _write_test_log() {
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     # Construir JSON manualmente (sin dependencias externas)
-    local entry="{\"timestamp\":\"$timestamp\",\"suite\":\"$suite\",\"status\":\"$status\",\"passed\":$pass,\"failed\":$fail,\"commit\":\"$commit\",\"branch\":\"$branch\""
+    local entry="{\"timestamp\":\"$timestamp\",\"suite\":\"$suite\",\"env\":\"$env\",\"status\":\"$status\",\"passed\":$pass,\"failed\":$fail,\"commit\":\"$commit\",\"branch\":\"$branch\""
     [ -n "$ticket" ] && entry="$entry,\"ticket\":\"$ticket\""
     entry="$entry}"
 

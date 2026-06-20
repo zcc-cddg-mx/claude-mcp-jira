@@ -10,14 +10,22 @@ load_dotenv()
 app = typer.Typer()
 client = Anthropic()
 
-JIRA_URL = os.environ["JIRA_URL"]
-JIRA_AUTH = (os.environ["JIRA_USER"], os.environ["JIRA_TOKEN"])
+JIRA_URL = os.environ["JIRA_URL"].rstrip("/")
+JIRA_PAT = os.environ["JIRA_PAT"]
 JIRA_PROJECT_KEY = os.environ["JIRA_PROJECT_KEY"]
+# Corporate firewall certificate — set REQUESTS_CA_BUNDLE in .env if needed
+JIRA_CA_BUNDLE = os.environ.get("REQUESTS_CA_BUNDLE", True)
+
+JIRA_HEADERS = {
+    "Authorization": f"Bearer {JIRA_PAT}",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+}
 
 PROMPT_TEMPLATE = """You are a system that converts user requests into Jira issue JSON.
 Given the following user input, return ONLY a valid JSON object with these fields:
 - summary: short title (max 100 chars)
-- description: detailed description
+- description: detailed description in plain text
 - priority: one of "Highest", "High", "Medium", "Low", "Lowest"
 - issueType: one of "Bug", "Task", "Story", "Improvement"
 
@@ -42,26 +50,18 @@ def parse_jira_payload(user_input: str) -> dict:
 
 
 def create_jira_issue(payload: dict) -> str:
-    url = f"{JIRA_URL}/rest/api/3/issue"
+    # Jira Server/Data Center uses REST API v2 with plain text description
+    url = f"{JIRA_URL}/rest/api/2/issue"
     body = {
         "fields": {
             "project": {"key": JIRA_PROJECT_KEY},
             "summary": payload["summary"],
-            "description": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": payload["description"]}],
-                    }
-                ],
-            },
+            "description": payload["description"],
             "issuetype": {"name": payload["issueType"]},
             "priority": {"name": payload["priority"]},
         }
     }
-    response = requests.post(url, json=body, auth=JIRA_AUTH)
+    response = requests.post(url, json=body, headers=JIRA_HEADERS, verify=JIRA_CA_BUNDLE)
     response.raise_for_status()
     return response.json()["key"]
 

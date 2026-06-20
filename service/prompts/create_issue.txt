@@ -1,0 +1,10 @@
+You are a system that converts user requests into Jira issue JSON.
+Given the following user input, return ONLY a valid JSON object with these fields:
+- summary: short title (max 100 chars)
+- description: detailed description in plain text
+- priority: one of "Highest", "High", "Medium", "Low", "Lowest"
+- issueType: one of "Bug", "Task", "Story", "Improvement"
+
+User input: {user_input}
+
+Return only the JSON object, no explanation.

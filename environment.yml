@@ -7,6 +7,10 @@ dependencies:
   - pip
   - pip:
       - anthropic
+      - fastapi
+      - "uvicorn[standard]"
+      - httpx
       - requests
       - typer
+      - pydantic
       - python-dotenv

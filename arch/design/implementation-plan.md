@@ -57,38 +57,21 @@ python cli/main.py create "bug login en producción"
 
 ---
 
-## Fase 3 — Comandos completos + JQL controlado
+## Fase 3 — Comandos completos + JQL controlado ✅
 
 **Objetivo**: soporte para los 4 comandos CLI con clasificación de intención y queries JQL seguras.
 
 ### Entregables
-- Dispatcher de intención en el service layer
-- 4 comandos: `create`, `update`, `summarize`, `list`
-- Endpoints adicionales en FastAPI
+- 4 comandos CLI: `create`, `update`, `summarize`, `list_issues`
+- `service/clients/jql_builder.py` — Claude → struct → JQL seguro
+- `service/clients/rate_limiter.py` — sliding window por usuario
+- Endpoints: `PATCH /issues/{key}`, `GET /issues/{key}/summary`, `POST /issues/search`
 
-### Tareas
-1. Implementar clasificador de intención: texto → `{intent, params}`
-2. Agregar `PATCH /issues/{key}` — actualiza summary/description/status vía transiciones Jira v2
-3. Agregar `GET /issues/{key}/summary` — Claude genera resumen legible
-4. Agregar `GET /issues?query=<texto>` con JQL controlado (ver abajo)
-5. Prompt templates separados por operación en `service/prompts/`
-6. Validar output de Claude con Pydantic antes de llamar a Jira
-7. Rate limiting en FastAPI + quotas por usuario
-
-### JQL controlado (riesgo mitigado)
-Claude **no genera JQL directamente**. En su lugar:
-- Claude genera un objeto estructurado: `{"assignee": "me", "status": "open", "date_range": "last_week"}`
-- El service layer construye el JQL seguro a partir de ese objeto
-- `MAX_RESULTS = 50` fijo en todas las queries
-- `ALLOWED_FIELDS` lista blanca de campos permitidos en filtros
-
-```python
-# Claude → struct → builder JQL controlado
-struct = claude_parse_query("mis bugs abiertos de esta semana")
-# → {"assignee": "currentUser()", "issuetype": "Bug", "status": "Open", "date_range": "last_week"}
-jql = build_jql(struct, max_results=50)
-# → "assignee = currentUser() AND issuetype = Bug AND status = Open AND created >= -7d ORDER BY created DESC"
-```
+### JQL controlado
+Claude **no genera JQL directamente**:
+- Claude genera struct: `{"assignee": "currentUser()", "issuetype": "Bug", ...}`
+- El service layer construye el JQL seguro
+- `MAX_RESULTS = 50` fijo, sin excepciones
 
 ### Criterio de éxito
 ```bash
@@ -99,77 +82,28 @@ python cli/main.py list "mis bugs abiertos de esta semana"
 
 ---
 
-## Fase 4 — MCP Server (servicio deployable interno) + Auth + RBAC
+## Fase 4 — MCP Server (servicio deployable interno) ✅
 
-**Objetivo**: exponer la integración como MCP server desplegable en red interna con autenticación, control de acceso por rol y robustez ante abuso.
+**Objetivo**: exponer la integración como MCP server SSE desplegable en red interna con auth, RBAC y protecciones en dos capas.
 
 ### Entregables
-- `mcp/server.py` — SDK `mcp`, 4 herramientas, delega al service layer
-- Auth MCP: API key interna + IP allowlist
-- RBAC básico: `dev` (crear/consultar), `lead` (actualizar/priorizar), `system` (todo)
-- Pre-validación ligera en cada herramienta MCP (antes de llamar al backend)
-- Rate limiting por API key en el MCP server
-- Output normalizado — Claude solo recibe `{key, status}`, nunca el payload completo
-- `mcp/Dockerfile` — imagen deployable en red interna
-- Configuración para `.claude/settings.json`
+- `mcp/server.py` — SSE server, 4 herramientas, delega al service layer
+- `mcp/auth.py` — API key + IP allowlist por CIDR
+- `mcp/rbac.py` — roles dev/lead/system, mapeo API key → rol
+- `mcp/rate_limiter.py` — sliding window por API key (independiente del service layer)
+- `mcp/service_client.py` — output filtrado antes de devolver al LLM
+- `mcp/Dockerfile` + `docker-compose.yml` actualizado
 
-### Tareas
-1. Instalar SDK MCP (`pip install mcp`)
-2. Crear `mcp/server.py` con herramientas: `create_jira_issue`, `update_jira_issue`, `search_jira_issues`, `get_jira_issue`
-3. Cada herramienta delega al service layer FastAPI (no duplicar lógica)
-4. Middleware de autenticación: `X-API-Key` header + IP allowlist (`10.0.0.0/8`, `192.168.0.0/16`)
-5. Middleware RBAC: mapeo `user → rol → acciones permitidas`
-6. Pre-validación ligera por herramienta: longitud de input, tipos requeridos — rechazar antes de llamar al backend
-7. Rate limiting por API key: `max_calls = 10/min` por defecto, configurable
-8. Normalizar respuestas: devolver solo campos esenciales al LLM
-9. `mcp/Dockerfile` — servicio independiente deployable
-10. (Opcional) Policy Engine: `enforce_policy()` — si `priority == Critical` → `require_approval()`
-11. Documentar configuración SSE interna en `mcp/README.md`
+### Protecciones MCP (segunda capa sobre el service layer)
 
-### Pre-validación ligera (defensa en profundidad)
-```python
-# Bloquear abuso antes de llegar al backend
-if len(arguments["text"]) > 2000:
-    raise ValueError("input demasiado largo — máximo 2000 caracteres")
-if not arguments.get("text", "").strip():
-    raise ValueError("input vacío")
-```
-
-### Rate limiting por API key
-```python
-@rate_limit(key=api_key, max_calls=10, window_seconds=60)
-async def create_jira_issue(arguments): ...
-```
-
-### Output normalizado
-```python
-# Nunca reenviar el payload completo al LLM
-return {"key": result["key"], "status": "created"}   # create
-return {"key": key, "status": "updated"}              # update
-return {"issues": [{"key": i["key"], "summary": i["summary"]} for i in results]}  # search
-```
-
-### Auth MCP
-```python
-X-API-Key: <clave-interna>   # header requerido en cada llamada
-ALLOWED_IPS = ["10.0.0.0/8", "192.168.0.0/16"]
-```
-
-### RBAC
-```python
-ROLES = {
-    "dev":    ["create_issue", "get_issue", "search_issues"],
-    "lead":   ["create_issue", "update_issue", "get_issue", "search_issues"],
-    "system": ["create_issue", "update_issue", "get_issue", "search_issues"],
-}
-```
-
-### Policy Engine (opcional)
-```python
-def enforce_policy(action):
-    if action.type == "update" and action.priority == "Critical":
-        require_approval()   # notifica al lead antes de ejecutar
-```
+| Control | Implementación |
+|---|---|
+| API key | `X-API-Key` header, `MCP_API_KEY` |
+| IP allowlist | CIDRs `10.0.0.0/8`, `192.168.0.0/16` |
+| RBAC | dev (create/get/search) · lead (+update) · system (todo) |
+| Pre-validación | input vacío o >2000 chars rechazado antes de llamar al backend |
+| Rate limiting | `MCP_RATE_LIMIT_MAX_CALLS=10/60s` por API key |
+| Output normalizado | LLM recibe solo `{key,status}` o `{key,summary}` |
 
 ### Configuración `.claude/settings.json`
 ```json
@@ -177,8 +111,8 @@ def enforce_policy(action):
   "mcpServers": {
     "jira": {
       "type": "sse",
-      "url": "http://mcp-jira.internal/sse",
-      "headers": { "X-API-Key": "<clave-interna>" }
+      "url": "http://mcp-jira.internal:8001/sse",
+      "headers": { "X-API-Key": "<MCP_API_KEY>" }
     }
   }
 }
@@ -187,8 +121,8 @@ def enforce_policy(action):
 ### Criterio de éxito
 ```
 Claude Code: "crea un ticket para el bug que encontramos en auth"
-→ Claude invoca create_jira_issue (auth OK, pre-validación OK, rate limit OK)
-→ MCP delega a service layer → PROJ-003 creado
+→ auth OK → RBAC OK → rate limit OK → pre-validación OK
+→ service layer → Claude → Jira → PROJ-003
 → Claude recibe: {"key": "PROJ-003", "status": "created"}
 ```
 
@@ -196,26 +130,15 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 
 ## Fase 5 — Observabilidad + Caching (opcional / futura)
 
-**Objetivo**: llevar el sistema de ~85% a producción top-tier con métricas, trazas distribuidas y reducción de carga en Jira.
+**Objetivo**: llevar el sistema a producción top-tier con métricas, trazas distribuidas y reducción de carga en Jira.
 
-> Esta fase no es bloqueante para producción. Activar cuando el volumen de uso lo justifique.
+> No bloqueante para producción. Activar cuando el volumen lo justifique.
 
 ### Entregables
-- Métricas Prometheus expuestas en `/metrics` (service layer + MCP)
-- Trazas distribuidas con OpenTelemetry — correlación entre MCP, service layer y Jira
-- Caching de 30-60s en `search_jira_issues` — reduce carga repetitiva en Jira
-
-### Tareas
-1. Instrumentar FastAPI con `prometheus-fastapi-instrumentator`
-2. Agregar `opentelemetry-sdk` con exportador configurable (Jaeger / Zipkin)
-3. Propagar `trace_id` desde MCP → service layer → Jira (header `X-Trace-ID`)
-4. Implementar cache en memoria (TTL 30-60s) para resultados de búsqueda
-5. Dashboard Grafana básico: latencia, errores, tickets creados/día
-
-### Por qué es opcional
-- `request_id` UUID ya cubre trazabilidad básica para el volumen inicial
-- El caching requiere decisiones sobre invalidación que dependen del uso real
-- Prometheus/OTel requieren infraestructura adicional (Grafana, Jaeger) no disponible en todos los entornos Zurich
+- Métricas Prometheus en `/metrics` (service layer + MCP)
+- Trazas distribuidas OpenTelemetry con `trace_id` propagado
+- Caching 30-60s en `search_jira_issues`
+- Dashboard Grafana básico
 
 ---
 
@@ -224,25 +147,34 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 ```
 claude-mcp-jira/
 ├── cli/
-│   └── main.py                  # Typer CLI — cliente HTTP del service layer
+│   └── main.py                  # Typer CLI — 4 comandos
 ├── service/
-│   ├── main.py                  # FastAPI app
+│   ├── main.py                  # FastAPI v0.3.0
 │   ├── audit.py                 # JSON-lines con request_id
-│   ├── routes/
+│   ├── routes/                  # issues, update, summarize, search
 │   ├── schemas/
 │   ├── clients/
 │   │   ├── sanitizer.py         # Sanitización extendida
 │   │   ├── claude_client.py
-│   │   └── jira_client.py       # PAT Bearer + cert + timeout
-│   └── prompts/                 # Templates por operación
+│   │   ├── jira_client.py       # PAT Bearer + cert + timeout
+│   │   ├── jql_builder.py       # Claude → struct → JQL seguro
+│   │   └── rate_limiter.py      # Sliding window por usuario
+│   └── prompts/                 # Templates: create, update, summarize, search
 ├── mcp/
-│   ├── server.py                # MCP server con auth + RBAC
+│   ├── server.py                # SSE server — 4 herramientas
+│   ├── auth.py                  # API key + IP allowlist
+│   ├── rbac.py                  # Roles y permisos
+│   ├── rate_limiter.py          # Rate limit MCP por API key
+│   ├── service_client.py        # Cliente httpx con output filtrado
 │   ├── Dockerfile
 │   └── README.md
 ├── certs/                       # Certificados raíz corporativos Zurich
 ├── arch/
+│   ├── design/
+│   ├── evaluations/
+│   └── reports/
 ├── Dockerfile                   # Service layer
-├── docker-compose.yml
+├── docker-compose.yml           # service (8000) + mcp (8001)
 ├── environment.yml
 ├── .env.example
 └── CLAUDE.md
@@ -254,7 +186,6 @@ claude-mcp-jira/
 
 ```
 anthropic
-mcp
 fastapi
 uvicorn[standard]
 httpx
@@ -262,6 +193,8 @@ requests
 typer
 pydantic
 python-dotenv
+mcp[cli]
+starlette
 ```
 
 ---
@@ -283,9 +216,9 @@ python-dotenv
 | Trazabilidad | `request_id` UUID por operación | Correlacionar logs entre CLI, service y Jira |
 | Auth MCP | API key + IP allowlist | Expone capacidades críticas; no debe ser acceso abierto |
 | RBAC MCP | dev / lead / system | Principio de menor privilegio por rol |
-| Pre-validación MCP | Ligera, antes de llamar al backend | Bloquear abuso (input >2000 chars, vacíos) sin latencia de red |
-| Rate limiting | En MCP (por API key) + FastAPI (por endpoint) | Defensa en profundidad — dos capas independientes |
-| Output MCP | Normalizado (`{key, status}` solamente) | Evitar filtración de datos internos hacia el LLM |
-| Session context | `request_id` UUID (sin estado de sesión completo) | Trazabilidad suficiente; sesiones completas añaden complejidad innecesaria en esta etapa |
+| Pre-validación MCP | Ligera, antes de llamar al backend | Bloquear abuso sin latencia de red |
+| Rate limiting | En MCP (por API key) + service (por usuario) | Defensa en profundidad — dos capas independientes |
+| Output MCP | Normalizado (`{key,status}`) | Evitar filtración de datos internos hacia el LLM |
+| Session context | `request_id` UUID (sin estado de sesión completo) | Trazabilidad suficiente; sesiones añaden complejidad innecesaria |
+| Persistencia MCP | Ninguna — stateless | Sin disco, escalable horizontalmente, menor superficie de ataque |
 | Observabilidad | Opcional — Fase 5 | Requiere infra adicional; `request_id` cubre el MVP |
-| Caching | Opcional — Fase 5 | `search_jira_issues` 30-60s TTL cuando el volumen lo justifique |

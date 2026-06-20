@@ -15,7 +15,7 @@ Three-layer design — CLI and MCP server never call Claude or Jira directly:
 ```
 [CLI (Typer)]     ──HTTP──►
                             [Service Layer (FastAPI)] → [Claude API (LiteLLM proxy)]
-[MCP Server]      ──HTTP──►                           → [Jira REST API v2 — jira.zurich.com]
+[MCP Server SSE]  ──HTTP──►                           → [Jira REST API v2 — jira.zurich.com]
 ```
 
 **Key constraints for Zurich environment:**
@@ -29,17 +29,18 @@ Three-layer design — CLI and MCP server never call Claude or Jira directly:
 ```bash
 conda env create -f environment.yml
 conda activate claude-mcp-jira
-cp .env.example .env  # fill in JIRA_PAT and uncomment REQUESTS_CA_BUNDLE
+cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY and uncomment REQUESTS_CA_BUNDLE
 ```
 
 ## Running
 
 ```bash
-# Via service layer
+# Full stack (service layer + MCP server)
 docker compose up
 
 # Dev mode (no Docker)
-uvicorn service.main:app --reload
+uvicorn service.main:app --reload          # service on :8000
+python -m mcp.server                       # MCP on :8001
 
 # CLI commands
 python cli/main.py create "bug login en producción prioridad alta"
@@ -47,6 +48,24 @@ python cli/main.py update PROJ-123 "cambiar prioridad a crítica"
 python cli/main.py summarize PROJ-123
 python cli/main.py list "mis bugs abiertos de esta semana"
 ```
+
+## Connect Claude Code to MCP
+
+Add to `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "jira": {
+      "type": "sse",
+      "url": "http://localhost:8001/sse",
+      "headers": { "X-API-Key": "<MCP_API_KEY>" }
+    }
+  }
+}
+```
+
+For internal deployment replace `localhost:8001` with `mcp-jira.internal:8001`.
 
 ## Service layer — endpoints
 
@@ -58,17 +77,32 @@ python cli/main.py list "mis bugs abiertos de esta semana"
 | `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50) |
 | `GET` | `/health` | Health check |
 
-## Service layer — security
+## MCP server — tools
 
-- `service/clients/sanitizer.py` — strips tokens, RFC 1918 IPs, internal hostnames, stack traces before sending to Claude
-- `service/audit.py` — JSON-lines audit log with `request_id` UUID per operation (`audit.log`)
-- `service/clients/jql_builder.py` — Claude → struct → safe JQL, MAX_RESULTS=50 always enforced
-- `service/clients/rate_limiter.py` — sliding window per user (`RATE_LIMIT_MAX_CALLS=30`, `RATE_LIMIT_WINDOW=60`)
-- `service/clients/jira_client.py` — PAT Bearer auth, corporate cert, `JIRA_TIMEOUT` (default 10s)
+| Tool | Rol mínimo | Descripción |
+|---|---|---|
+| `create_jira_issue` | dev | Crea ticket desde texto |
+| `update_jira_issue` | lead | Actualiza ticket desde texto |
+| `get_jira_issue` | dev | Resumen de ticket |
+| `search_jira_issues` | dev | Búsqueda NL (máx. 50) |
+
+## Security layers
+
+| Capa | Dónde | Qué hace |
+|---|---|---|
+| Sanitización | service layer | Elimina tokens, IPs RFC1918, hostnames internos, stack traces |
+| Audit log | service layer | JSON-lines con `request_id` UUID por operación |
+| JQL builder | service layer | Claude → struct → JQL seguro, MAX_RESULTS=50 |
+| Rate limit (NL) | service layer | 30 req/60s por usuario |
+| API key + IP allowlist | MCP server | Autenticación + restricción de red |
+| RBAC | MCP server | Roles dev/lead/system por API key |
+| Rate limit (MCP) | MCP server | 10 calls/60s por API key |
+| Pre-validación | MCP server | Rechaza inputs vacíos o >2000 chars |
+| Output normalizado | MCP server | LLM solo recibe `{key,status}` o `{key,summary}` |
 
 ## Jira Auth (Server/DC)
 
-Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set it as `JIRA_PAT` in `.env`. The client sends `Authorization: Bearer <PAT>` on every request.
+Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set as `JIRA_PAT` in `.env`.
 
 ## Corporate certificates
 
@@ -85,6 +119,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Arquitectura general | `arch/design/architecture-overview.md` |
 | Plan de implementación | `arch/design/implementation-plan.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
+| MCP server config | `mcp/README.md` |
 | Evaluaciones externas | `arch/evaluations/` |
 
 ## Implementation phases
@@ -94,5 +129,5 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 1 — Prototipo CLI | ✅ Completa | `cli/main.py` — comando `create` directo |
 | 2 — Service Layer | ✅ Completa | FastAPI + sanitización + audit log + timeouts |
 | 3 — Comandos completos | ✅ Completa | `update`, `summarize`, `list` + JQL controlado + rate limiter |
-| 4 — MCP Server | Pendiente | Servicio Docker con auth API key + RBAC + pre-validación + output normalizado |
+| 4 — MCP Server | ✅ Completa | SSE Docker + auth API key + RBAC + rate limit + output normalizado |
 | 5 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |

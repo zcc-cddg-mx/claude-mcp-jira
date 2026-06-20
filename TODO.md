@@ -1,0 +1,68 @@
+# TODO — claude-mcp-jira
+
+Estado general: Fases 1-4 completas y validadas (service layer + CLI 8/8 e2e).
+Actualizar este archivo al completar o añadir tareas.
+
+---
+
+## En progreso
+
+*(ninguna)*
+
+---
+
+## Pendiente
+
+### Validación
+
+- [ ] **Test e2e MCP server** — validar el MCP server en dev (`:18001`) end-to-end
+  - Levantar con `bash scripts/dev.sh both`
+  - Conectar Claude Code via SSE (`http://localhost:18001/sse`)
+  - Verificar las 4 herramientas: `create_jira_issue`, `update_jira_issue`, `get_jira_issue`, `search_jira_issues`
+  - Verificar auth (API key), RBAC (rol dev vs lead) y rate limiting
+
+### Implementación
+
+- [ ] **Fase 5 — Soporte SAZ** — tickets Solicitudes Release Zurich vinculados a ZNRX
+  - Bloqueantes resueltos: link type = `Relates` (id `10003`), campos SAZ en `docs/jira-fields.md`
+  - Ver plan completo en `arch/design/implementation-plan.md` → Fase 5
+  - Entregables: `service/routes/saz.py`, prompt SAZ, herramienta MCP `create_saz_request`
+
+- [ ] **Fase 6 — Observabilidad** *(opcional — activar cuando el volumen lo justifique)*
+  - Métricas Prometheus en `/metrics`
+  - Trazas OpenTelemetry con `trace_id` propagado
+  - Caching 30-60s en `search_jira_issues`
+  - Dashboard Grafana básico
+
+### Deuda técnica
+
+- [ ] **`scripts/dev.sh` — path miniconda hardcodeado**
+  - `/home/idavid/miniconda3/envs/claude-mcp-jira/bin/uvicorn` no es portable
+  - Solución sugerida: detectar desde `$CONDA_PREFIX` o `conda run -n claude-mcp-jira`
+
+### Limpieza Jira
+
+- [ ] **Eliminar tickets hackathon en Done** *(opcional — son histórico)*
+  - ZNRX-67942, ZNRX-67943, ZNRX-67944, ZNRX-67945, ZNRX-67946
+
+---
+
+## Completado
+
+- [x] Fase 1 — Prototipo CLI (`create`)
+- [x] Fase 2 — Service Layer FastAPI + sanitización + audit log
+- [x] Fase 3 — Comandos completos (`update`, `summarize`, `list-issues`) + JQL controlado
+- [x] Fase 4 — MCP Server SSE + auth API key + RBAC + rate limit + output normalizado
+- [x] Fase 4.1 — Ajustes post-validación e2e ZNRX (customfield_25832, priority IDs, Bug fallback)
+- [x] Prompts traducidos al español (`create_issue`, `update_issue`, `search_issues`)
+- [x] `TICKET_LANG` env var — soporte bilingüe es/en por proyecto
+- [x] `scripts/dev.sh` — modos stop/restart/status/both + nohup + pidfile + JIRA_TIMEOUT=30
+- [x] `scripts/test-dev.sh` — kill/reinicio automático + prefijo `[MCP Claude Jira Test]`
+- [x] Documentación Jira real en `docs/`:
+  - [x] `jira-projects.md` — metadata ZNRX, AIPROJECTS, SAZ, SCRX
+  - [x] `jira-roles.md` — permisos efectivos por proyecto
+  - [x] `jira-fields.md` — campos requeridos/opcionales y valores permitidos
+  - [x] `jira-link-types.md` — 29 link types; recomendación SAZ→ZNRX
+  - [x] `jira-workflows.md` — statuses y transiciones por proyecto
+- [x] Fase 5 — bloqueantes resueltos (link type + campos SAZ documentados)
+- [x] Limpieza Jira — 17 tickets de prueba eliminados (+ ~90 subtareas)

@@ -151,7 +151,7 @@ def clone_issue(source_key: str, source: dict, payload) -> str:
     # Only create link for top-level issues; subtasks are already tied to parent
     if not parent:
         _post_noret("/rest/api/2/issueLink", {
-            "type": {"id": "10001"},
+            "type": {"name": "Cloners"},
             "outwardIssue": {"key": source_key},
             "inwardIssue": {"key": new_key},
         })

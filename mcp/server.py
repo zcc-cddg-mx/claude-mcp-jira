@@ -18,65 +18,75 @@ from . import service_client
 
 server = Server("claude-mcp-jira")
 
-_TOOLS = [
-    Tool(
-        name="create_jira_issue",
-        description="Create a Jira ticket from a plain-text description.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "Natural language description of the issue to create",
-                    "maxLength": 2000,
+_MAX_PAYLOAD_SIZE = int(os.environ.get("MCP_MAX_PAYLOAD_SIZE", "2000"))
+_MAX_RESULTS_HINT = int(os.environ.get("JIRA_MAX_RESULTS", "50"))
+
+
+def _make_tools() -> list[Tool]:
+    max_len = _MAX_PAYLOAD_SIZE
+    search_max = min(500, max_len)
+    return [
+        Tool(
+            name="create_jira_issue",
+            description="Create a Jira ticket from a plain-text description.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language description of the issue to create",
+                        "maxLength": max_len,
+                    },
                 },
+                "required": ["text"],
             },
-            "required": ["text"],
-        },
-    ),
-    Tool(
-        name="update_jira_issue",
-        description="Update an existing Jira ticket using a plain-text instruction.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
-                "text": {
-                    "type": "string",
-                    "description": "Natural language instruction of what to change",
-                    "maxLength": 2000,
+        ),
+        Tool(
+            name="update_jira_issue",
+            description="Update an existing Jira ticket using a plain-text instruction.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language instruction of what to change",
+                        "maxLength": max_len,
+                    },
                 },
+                "required": ["key", "text"],
             },
-            "required": ["key", "text"],
-        },
-    ),
-    Tool(
-        name="get_jira_issue",
-        description="Get a plain-text summary of a Jira ticket.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
-            },
-            "required": ["key"],
-        },
-    ),
-    Tool(
-        name="search_jira_issues",
-        description="Search Jira issues using a natural language query. Returns up to 50 results.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Natural language search query",
-                    "maxLength": 500,
+        ),
+        Tool(
+            name="get_jira_issue",
+            description="Get a plain-text summary of a Jira ticket.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
                 },
+                "required": ["key"],
             },
-            "required": ["query"],
-        },
-    ),
-]
+        ),
+        Tool(
+            name="search_jira_issues",
+            description=f"Search Jira issues using a natural language query. Returns up to {_MAX_RESULTS_HINT} results.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language search query",
+                        "maxLength": search_max,
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+    ]
+
+
+_TOOLS = _make_tools()
 
 
 @server.list_tools()
@@ -103,8 +113,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     # Pre-validation
     text = arguments.get("text", "") or arguments.get("query", "")
-    if text and len(text) > 2000:
-        return [TextContent(type="text", text="Error: input exceeds 2000 characters")]
+    if text and len(text) > _MAX_PAYLOAD_SIZE:
+        return [TextContent(type="text", text=f"Error: input exceeds {_MAX_PAYLOAD_SIZE} characters")]
     if text and not text.strip():
         return [TextContent(type="text", text="Error: empty input")]
 

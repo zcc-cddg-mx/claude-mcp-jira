@@ -1,6 +1,8 @@
+import os
+
 from ..schemas import SearchQueryStruct
 
-_MAX_RESULTS = 50
+_MAX_RESULTS = min(int(os.environ.get("JIRA_MAX_RESULTS", "50")), 50)
 
 _DATE_RANGE_MAP = {
     "today": "startOfDay()",

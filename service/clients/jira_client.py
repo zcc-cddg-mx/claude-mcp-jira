@@ -16,6 +16,21 @@ _HEADERS = {
     "Accept": "application/json",
 }
 
+# ZNRX project requires customfield_25832 ("Línea de Servicio") on top-level issues.
+# "BAU" (id 44461) is the standard value for development work.
+_LINEA_SERVICIO_BAU = {"id": "44461"}
+
+# ZNRX does not accept priority by name — must use ID.
+# ZNRX only allows: Highest (1), High (2), Low (4). Any other value is omitted.
+# "Bug" issuetype has additional workflow validations in ZNRX that block creation via API;
+# fall back to "Task" and preserve intent in summary/description.
+_PRIORITY_IDS = {
+    "Highest": "1",
+    "High": "2",
+    "Low": "4",
+}
+_ISSUETYPE_FALLBACK = {"Bug": "Task", "Improvement": "Task"}
+
 
 def _get(path: str) -> dict:
     r = requests.get(f"{_JIRA_URL}{path}", headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT)
@@ -40,16 +55,18 @@ def _post_noret(path: str, body: dict) -> None:
 
 
 def create_issue(payload: JiraIssuePayload) -> str:
-    body = {
-        "fields": {
-            "project": {"key": _JIRA_PROJECT_KEY},
-            "summary": payload.summary,
-            "description": payload.description,
-            "issuetype": {"name": payload.issueType},
-            "priority": {"name": payload.priority},
-        }
+    issuetype = _ISSUETYPE_FALLBACK.get(payload.issueType, payload.issueType)
+    priority_id = _PRIORITY_IDS.get(payload.priority)
+    fields: dict = {
+        "project": {"key": _JIRA_PROJECT_KEY},
+        "summary": payload.summary,
+        "description": payload.description,
+        "issuetype": {"name": issuetype},
+        "customfield_25832": _LINEA_SERVICIO_BAU,
     }
-    return _post("/rest/api/2/issue", body)["key"]
+    if priority_id:
+        fields["priority"] = {"id": priority_id}
+    return _post("/rest/api/2/issue", {"fields": fields})["key"]
 
 
 def get_issue(key: str) -> dict:
@@ -63,7 +80,9 @@ def update_issue(key: str, payload: UpdateIssuePayload) -> None:
     if payload.description is not None:
         fields["description"] = payload.description
     if payload.priority is not None:
-        fields["priority"] = {"name": payload.priority}
+        priority_id = _PRIORITY_IDS.get(payload.priority)
+        if priority_id:
+            fields["priority"] = {"id": priority_id}
 
     if fields:
         _put(f"/rest/api/2/issue/{key}", {"fields": fields})

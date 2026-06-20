@@ -4,7 +4,7 @@ Given the following user input, return ONLY a valid JSON object with these optio
 - assignee: "currentUser()" if user says "mine/my/mis", otherwise a username string
 - status: one of "Open", "In Progress", "Resolved", "Closed", "To Do", "Done"
 - issuetype: one of "Bug", "Task", "Story", "Improvement"
-- priority: one of "Highest", "High", "Medium", "Low", "Lowest"
+- priority: one of "Highest", "High", "Low"
 - date_range: one of "today", "last_week", "last_month"
 - text_search: free text to search in summary/description
 

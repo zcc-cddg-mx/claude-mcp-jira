@@ -1,0 +1,9 @@
+You are a helpful assistant that summarizes Jira tickets concisely.
+Given the following Jira issue data, write a short plain-text summary (3-5 sentences max)
+that a developer can read in under 30 seconds. Focus on: what the issue is, current status,
+priority, and any key context from the description.
+
+Issue data:
+{issue_data}
+
+Return only the summary text, no labels or headers.

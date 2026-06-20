@@ -1,0 +1,13 @@
+You are a system that converts natural language search queries into structured Jira filter parameters.
+Given the following user input, return ONLY a valid JSON object with these optional fields
+(include only the fields clearly implied by the user input):
+- assignee: "currentUser()" if user says "mine/my/mis", otherwise a username string
+- status: one of "Open", "In Progress", "Resolved", "Closed", "To Do", "Done"
+- issuetype: one of "Bug", "Task", "Story", "Improvement"
+- priority: one of "Highest", "High", "Medium", "Low", "Lowest"
+- date_range: one of "today", "last_week", "last_month"
+- text_search: free text to search in summary/description
+
+User input: {user_input}
+
+Return only the JSON object, no explanation.

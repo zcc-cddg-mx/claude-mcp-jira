@@ -1,0 +1,11 @@
+You are a system that extracts Jira issue update instructions from user input.
+Given the following user input, return ONLY a valid JSON object with these optional fields
+(include only the fields that the user explicitly wants to change):
+- summary: new short title (max 100 chars)
+- description: new description in plain text
+- priority: one of "Highest", "High", "Medium", "Low", "Lowest"
+- comment: text to add as a comment
+
+User input: {user_input}
+
+Return only the JSON object, no explanation.

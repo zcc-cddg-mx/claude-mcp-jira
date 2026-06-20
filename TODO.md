@@ -54,8 +54,9 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Limpieza Jira
 
-- [ ] **Eliminar tickets hackathon en Done** *(opcional — son histórico)*
-  - ZNRX-67942, ZNRX-67943, ZNRX-67944, ZNRX-67945, ZNRX-67946
+- [ ] **Eliminar tickets `[MCP Claude Jira Test]` activos** — solo los creados por el test runner
+  - JQL: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+  - Los tickets de hackathon (ZNRX-67942..67946) son histórico del proyecto y no se tocan
 
 ---
 

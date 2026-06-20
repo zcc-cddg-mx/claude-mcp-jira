@@ -38,9 +38,16 @@ cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY and uncomment REQUESTS_CA_
 # Full stack (service layer + MCP server)
 docker compose up
 
-# Dev mode (no Docker)
-uvicorn service.main:app --reload          # service on :8000
-python -m jira_mcp.server                  # MCP on :8001
+# Dev mode (no Docker) — puertos 18000/18001 (8000 ocupado por Portainer en dev)
+bash scripts/dev.sh both       # service :18000 + MCP :18001
+bash scripts/dev.sh stop       # detener todo
+bash scripts/dev.sh restart    # reinicio limpio
+bash scripts/dev.sh status     # ver estado
+
+# Tests
+bash scripts/test-dev.sh       # e2e service layer: 8 tests (CLI → FastAPI → Jira)
+bash scripts/test-mcp.sh       # e2e MCP server: 10 tests (tools + auth + RBAC)
+pytest tests/                  # tests unitarios: 52 tests (sanitizer, jql, auth, rbac)
 
 # CLI commands
 python cli/main.py create "bug login en producción prioridad alta"
@@ -58,14 +65,14 @@ Add to `.claude/settings.json`:
   "mcpServers": {
     "jira": {
       "type": "sse",
-      "url": "http://localhost:8001/sse",
+      "url": "http://localhost:18001/sse",
       "headers": { "X-API-Key": "<MCP_API_KEY>" }
     }
   }
 }
 ```
 
-For internal deployment replace `localhost:8001` with `mcp-jira.internal:8001`.
+Dev uses port 18001 (8001 in Docker). For internal deployment replace `localhost:18001` with `mcp-jira.internal:8001`.
 
 ## Service layer — endpoints
 
@@ -91,14 +98,17 @@ For internal deployment replace `localhost:8001` with `mcp-jira.internal:8001`.
 | Capa | Dónde | Qué hace |
 |---|---|---|
 | Sanitización | service layer | Elimina tokens, IPs RFC1918, hostnames internos, stack traces |
-| Audit log | service layer | JSON-lines con `request_id` UUID por operación |
-| JQL builder | service layer | Claude → struct → JQL seguro, MAX_RESULTS=50 |
-| Rate limit (NL) | service layer | 30 req/60s por usuario |
+| Audit log | service layer + MCP | JSON-lines con `request_id` UUID; rotación 10 MB × 5 backups |
+| JQL builder | service layer | Claude → struct → JQL seguro (`_jql_escape` en todos los campos), MAX_RESULTS=50 |
+| Sanitización HTTP errors | service layer | `sanitize(str(e))` en todos los `HTTPException.detail` |
+| Rate limit (NL) | service layer | 30 req/60s por usuario (`shared/rate_limiter.py`) |
 | API key + IP allowlist | MCP server | Autenticación + restricción de red |
 | RBAC | MCP server | Roles dev/lead/system por API key |
-| Rate limit (MCP) | MCP server | 10 calls/60s por API key |
+| Rate limit (MCP) | MCP server | 10 calls/60s por API key (`shared/rate_limiter.py`) |
 | Pre-validación | MCP server | Rechaza inputs vacíos o >2000 chars |
 | Output normalizado | MCP server | LLM solo recibe `{key,status}` o `{key,summary}` |
+| SSE timeout | MCP server | `asyncio.wait_for` con `MCP_SSE_TIMEOUT=300s` |
+| Tests unitarios | `tests/` | 52 tests: sanitizer, jql_builder, auth, rbac |
 
 ## Jira Auth (Server/DC)
 
@@ -121,6 +131,11 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Plan de implementación | `arch/design/implementation-plan.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
 | MCP server config | `jira_mcp/README.md` |
+| Proyectos Jira (restricciones, TICKET_LANG) | `docs/jira-projects.md` |
+| Campos requeridos por proyecto | `docs/jira-fields.md` |
+| Permisos efectivos del usuario | `docs/jira-roles.md` |
+| Tipos de link Jira | `docs/jira-link-types.md` |
+| Workflows por proyecto | `docs/jira-workflows.md` |
 | Evaluaciones externas | `arch/evaluations/` |
 
 ## Implementation phases
@@ -131,4 +146,12 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 2 — Service Layer | ✅ Completa | FastAPI + sanitización + audit log + timeouts |
 | 3 — Comandos completos | ✅ Completa | `update`, `summarize`, `list` + JQL controlado + rate limiter |
 | 4 — MCP Server | ✅ Completa | SSE Docker + auth API key + RBAC + rate limit + output normalizado |
-| 5 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
+| 4.1 — Ajustes e2e + TICKET_LANG | ✅ Completa | Campos ZNRX, priority IDs, prompts ES, idioma configurable |
+| 4.2 — Deuda técnica | ✅ Completa | JQL injection fix, audit MCP, rate limiter compartido, 52 unit tests |
+| 5 — Soporte SAZ | Futura | Tickets SAZ vinculados a ZNRX — bloqueantes resueltos |
+| 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
+
+## Test tickets (limpieza)
+
+Los tickets de prueba llevan siempre el prefijo `[MCP Claude Jira Test]`.
+JQL para localizar y limpiar: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`

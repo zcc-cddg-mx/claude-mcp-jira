@@ -32,9 +32,10 @@ bash scripts/dev.sh service    # solo service layer
 bash scripts/dev.sh stop       # detener todo
 bash scripts/dev.sh restart    # reinicio limpio
 
-# Tests end-to-end contra jira.zurich.com
+# Tests
 bash scripts/test-dev.sh       # service layer: 8 tests (CLI → FastAPI → Jira)
 bash scripts/test-mcp.sh       # MCP server: 10 tests (SSE tools + auth + RBAC)
+pytest tests/                  # unitarios: 52 tests (sanitizer, jql, auth, rbac)
 
 # Comandos CLI
 python cli/main.py create "bug login en producción prioridad alta"
@@ -76,7 +77,8 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 3 — Comandos completos | ✅ Completa | `update`, `summarize`, `list` + JQL controlado + rate limiter |
 | 4 — MCP Server | ✅ Completa | SSE Docker + auth API key + RBAC + rate limit + output normalizado |
 | 4.1 — Ajustes e2e + TICKET_LANG | ✅ Completa | Campos ZNRX, priority IDs, prompts ES, idioma configurable |
-| 5 — Soporte SAZ | Futura | Multi-proyecto: tickets Solicitudes Release Zurich (DevOps) |
+| 4.2 — Deuda técnica | ✅ Completa | JQL injection fix, audit MCP, rate limiter compartido, 52 unit tests |
+| 5 — Soporte SAZ | Futura | Tickets Solicitudes Release Zurich vinculados a ZNRX |
 | 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 
 ## Documentación

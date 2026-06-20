@@ -154,6 +154,25 @@ Correcciones aplicadas tras pruebas contra `jira.zurich.com` real (2026-06-19):
 
 ---
 
+## Fase 4.2 — Deuda técnica: seguridad y confiabilidad ✅
+
+Correcciones aplicadas tras auditoría de deuda técnica (2026-06-19):
+
+| Categoría | Ajuste | Archivo |
+|---|---|---|
+| **Crítica** | JQL injection — `_jql_escape()` en todos los campos (no solo `text_search`) | `jql_builder.py` |
+| **Crítica** | Audit log en MCP — `_audit()` con `request_id` en cada `call_tool()` | `jira_mcp/server.py` |
+| **Crítica** | HTTP errors saneados — `sanitize(str(e))` en todos los `HTTPException.detail` | `routes/*.py` |
+| **Media** | JSON parsing controlado — `_parse_json()` con `ValueError` descriptivo | `claude_client.py` |
+| **Media** | Rate limiter compartido — `shared/rate_limiter.py`; ambas capas instancian `RateLimiter` | `shared/` |
+| **Media** | Validación respuesta service layer — `_require()` en `service_client.py` | `jira_mcp/service_client.py` |
+| **Media** | SSE timeout — `asyncio.wait_for(timeout=MCP_SSE_TIMEOUT)` en `handle_sse` | `jira_mcp/server.py` |
+| **Media** | Audit log con rotación — `RotatingFileHandler` (10 MB × 5 backups) | `service/audit.py` |
+| **Baja** | Path conda portable — `scripts/_conda_env.sh`; detecta env sin path hardcodeado | `scripts/` |
+| **Baja** | Tests unitarios — `tests/` con 52 tests en 4 módulos de seguridad | `tests/` |
+
+---
+
 ## Fase 5 — Soporte multi-proyecto: tickets SAZ vinculados a ZNRX (futura)
 
 **Objetivo**: extender el sistema para crear tickets SAZ (*Solicitudes Release Zurich*) vinculados a un ticket ZNRX existente, cubriendo el flujo oficial de solicitudes DevOps dentro de un proyecto.
@@ -256,16 +275,27 @@ claude-mcp-jira/
 │   │   ├── jql_builder.py       # Claude → struct → JQL seguro
 │   │   └── rate_limiter.py      # Sliding window por usuario
 │   └── prompts/                 # Templates: create, update, summarize, search
-├── mcp/
-│   ├── server.py                # SSE server — 4 herramientas
+├── jira_mcp/
+│   ├── server.py                # SSE server — 4 herramientas + audit log
 │   ├── auth.py                  # API key + IP allowlist
 │   ├── rbac.py                  # Roles y permisos
-│   ├── rate_limiter.py          # Rate limit MCP por API key
-│   ├── service_client.py        # Cliente httpx con output filtrado
+│   ├── rate_limiter.py          # Rate limit MCP por API key (usa shared/)
+│   ├── service_client.py        # Cliente httpx con output filtrado + _require()
 │   ├── Dockerfile
 │   └── README.md
+├── shared/
+│   └── rate_limiter.py          # RateLimiter reutilizable (service + jira_mcp)
+├── tests/
+│   ├── test_sanitizer.py        # 13 tests
+│   ├── test_jql_builder.py      # 18 tests (escape + injection)
+│   ├── test_auth.py             # 10 tests
+│   └── test_rbac.py             # 11 tests
 ├── docs/
-│   └── jira-projects.md         # Metadata proyectos: ZNRX, AIPROJECTS, SAZ, SCRX
+│   ├── jira-projects.md         # Metadata proyectos: ZNRX, AIPROJECTS, SAZ, SCRX
+│   ├── jira-fields.md           # Campos requeridos/opcionales por proyecto
+│   ├── jira-roles.md            # Permisos efectivos del usuario
+│   ├── jira-link-types.md       # 29 link types; recomendación SAZ→ZNRX
+│   └── jira-workflows.md        # Statuses y transiciones por proyecto
 ├── certs/                       # Certificados raíz corporativos Zurich
 ├── arch/
 │   ├── design/
@@ -293,6 +323,7 @@ pydantic
 python-dotenv
 mcp[cli]
 starlette
+pytest
 ```
 
 ---

@@ -82,6 +82,8 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `PATCH` | `/issues/{key}` | Actualizar ticket desde texto libre |
 | `GET` | `/issues/{key}/summary` | Resumen Claude del ticket |
 | `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50) |
+| `POST` | `/issues/{key}/transition` | Cambiar estado (texto libre → Claude → transición Jira) |
+| `POST` | `/issues/{key}/worklog` | Registrar horas trabajadas (texto libre → Claude → worklog) |
 | `GET` | `/health` | Health check |
 
 ## MCP server — tools

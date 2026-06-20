@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 load_dotenv()
 
-from .routes import issues_router, search_router, summarize_router, update_router
+from .routes import issues_router, search_router, summarize_router, transitions_router, update_router, worklog_router
 
 
 @asynccontextmanager
@@ -24,6 +24,8 @@ app.include_router(issues_router)
 app.include_router(update_router)
 app.include_router(summarize_router)
 app.include_router(search_router)
+app.include_router(transitions_router)
+app.include_router(worklog_router)
 
 
 @app.get("/health")

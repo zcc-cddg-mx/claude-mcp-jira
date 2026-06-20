@@ -69,3 +69,34 @@ class IssueResult(BaseModel):
 class SearchResponse(BaseModel):
     total: int
     issues: list[IssueResult]
+
+
+class TransitionIssueRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000)
+
+
+class TransitionPayload(BaseModel):
+    transition_id: str
+    transition_name: str
+
+
+class TransitionIssueResponse(BaseModel):
+    key: str
+    status: str
+    transition: str
+
+
+class LogWorkRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000)
+
+
+class LogWorkPayload(BaseModel):
+    time_spent_seconds: int = Field(..., gt=0)
+    comment: Optional[str] = None
+    started: Optional[str] = None
+
+
+class LogWorkResponse(BaseModel):
+    key: str
+    time_spent_seconds: int
+    comment: Optional[str] = None

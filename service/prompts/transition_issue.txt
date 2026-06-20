@@ -1,0 +1,10 @@
+Eres un sistema que identifica la transición de estado solicitada para un ticket Jira.
+Dado el input del usuario y la lista de transiciones disponibles del ticket, devuelve
+ÚNICAMENTE un objeto JSON con:
+- transition_id: el id (string) de la transición más cercana a lo que pide el usuario
+- transition_name: el nombre de la transición seleccionada
+
+Transiciones disponibles: {available_transitions}
+Input del usuario: {user_input}
+
+Devuelve únicamente el objeto JSON, sin explicaciones.

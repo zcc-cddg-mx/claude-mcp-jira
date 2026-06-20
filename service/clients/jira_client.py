@@ -2,7 +2,7 @@ import os
 
 import requests
 
-from ..schemas import IssueResult, JiraIssuePayload, UpdateIssuePayload
+from ..schemas import IssueResult, JiraIssuePayload, LogWorkPayload, TransitionPayload, UpdateIssuePayload
 
 _JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 _JIRA_PAT = os.environ.get("JIRA_PAT", "")
@@ -92,6 +92,29 @@ def update_issue(key: str, payload: UpdateIssuePayload) -> None:
             f"/rest/api/2/issue/{key}/comment",
             {"body": payload.comment},
         )
+
+
+def get_transitions(key: str) -> list[dict]:
+    data = _get(f"/rest/api/2/issue/{key}/transitions")
+    return [{"id": t["id"], "name": t["name"]} for t in data.get("transitions", [])]
+
+
+def transition_issue(key: str, payload: TransitionPayload) -> str:
+    _post_noret(
+        f"/rest/api/2/issue/{key}/transitions",
+        {"transition": {"id": payload.transition_id}},
+    )
+    issue = _get(f"/rest/api/2/issue/{key}?fields=status")
+    return issue["fields"]["status"]["name"]
+
+
+def log_work(key: str, payload: LogWorkPayload) -> None:
+    body: dict = {"timeSpentSeconds": payload.time_spent_seconds}
+    if payload.comment:
+        body["comment"] = payload.comment
+    if payload.started:
+        body["started"] = payload.started
+    _post_noret(f"/rest/api/2/issue/{key}/worklog", body)
 
 
 def search_issues(jql: str, max_results: int) -> list[IssueResult]:

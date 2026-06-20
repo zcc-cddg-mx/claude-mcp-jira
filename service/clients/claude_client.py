@@ -5,7 +5,7 @@ from pathlib import Path
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
-from ..schemas import JiraIssuePayload, SearchQueryStruct, UpdateIssuePayload
+from ..schemas import JiraIssuePayload, LogWorkPayload, SearchQueryStruct, TransitionPayload, UpdateIssuePayload
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -69,6 +69,24 @@ def summarize_issue(issue_data: dict) -> str:
     safe_data = sanitize(json.dumps(issue_data, ensure_ascii=False))
     prompt = _load_prompt("summarize_issue").format(issue_data=safe_data)
     return _call(prompt, max_tokens=256).strip()
+
+
+def parse_transition_issue(user_input: str, available_transitions: list[dict]) -> TransitionPayload:
+    safe_input = sanitize(user_input)
+    transitions_str = json.dumps(available_transitions, ensure_ascii=False)
+    prompt = _load_prompt("transition_issue").format(
+        user_input=safe_input,
+        available_transitions=transitions_str,
+    )
+    raw = _strip_fences(_call(prompt))
+    return TransitionPayload(**_parse_json(raw, "transition_issue"))
+
+
+def parse_log_work(user_input: str) -> LogWorkPayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("log_work").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return LogWorkPayload(**_parse_json(raw, "log_work"))
 
 
 def parse_search_query(user_input: str) -> SearchQueryStruct:

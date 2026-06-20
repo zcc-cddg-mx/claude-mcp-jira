@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–4.5 completas. Docker validado (8/8 + 10/10). Próximo: Fase 5 (SAZ).
+Estado general: Fases 1–4.5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 5 (SAZ).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -26,11 +26,13 @@ Actualizar este archivo al completar o añadir tareas.
   - Caching 30-60s en `search_jira_issues`
   - Dashboard Grafana básico
 
-### Limpieza Jira
+- [ ] **Fase 7 — Multi-proyecto** *(futura — evaluar antes de implementar)*
+  - Ver `arch/evaluations/eval-multiproject-copilot.md`
+  - Objetivo: routing dinámico de proyecto; configuración por proyecto
 
-- [x] **Eliminar tickets `[MCP Claude Jira Test]` activos** — 6 tickets eliminados el 2026-06-20
-  - ZNRX-68147, 68154, 68163 (top-level + subtasks), 68161, 68162, 68170 (subtasks directos)
-  - Los tickets de hackathon (ZNRX-67942..67946) son histórico y no se tocan
+- [ ] **Fase 8 — UI** *(futura — evaluar antes de implementar)*
+  - Ver `arch/evaluations/eval-ui-copilot.md`
+  - Objetivo: interfaz web para usuarios no técnicos sobre los mismos endpoints
 
 ---
 
@@ -56,7 +58,6 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Fase 4.3 — Transiciones y log work: `POST /issues/{key}/transition` + `POST /issues/{key}/worklog`
 - [x] Docker — build + e2e 8/8 service + 10/10 MCP (cert DER→PEM, puertos 18000/18001, JIRA_TIMEOUT=30)
 - [x] Bitácora de tests — `logs/test-results.jsonl`, `scripts/test-docker.sh`, `scripts/test-log.sh`
-- [x] Limpieza Jira — tickets `[MCP Claude Jira Test]` eliminados en sesiones previas
 - [x] Fase 4.4 — Mejoras API:
   - [x] `POST /issues/{key}/comments` + MCP tool `add_comment_jira_issue` (dev)
   - [x] `POST /issues/{key}/assign` + MCP tool `assign_jira_issue` (lead)
@@ -68,5 +69,7 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Fase 4.5 — Link dinámico (eval-link-copilot):
   - [x] `GET /issue-link-types` — tipos reales de Jira con cache TTL 1h
   - [x] `POST /issues/{key}/link` — Claude recibe lista real, elige por nombre (no ID hardcodeado)
-  - [x] `link_issue()` usa `type.name` en lugar de `type.id`
+  - [x] `clone_issue()` y `link_issue()` usan `type.name` en lugar de `type.id`
   - [x] MCP tool `link_jira_issues` (dev)
+- [x] Limpieza Jira — 6 tickets `[MCP Claude Jira Test]` eliminados el 2026-06-20
+  - ZNRX-68147, 68154, 68163 (top-level + subtasks), 68161, 68162, 68170 (subtasks directos)

@@ -173,6 +173,26 @@ Correcciones aplicadas tras auditoría de deuda técnica (2026-06-19):
 
 ---
 
+## Fase 4.3 — Transiciones y Log Work ✅
+
+Nuevos endpoints para gestión del ciclo de vida del ticket (2026-06-19):
+
+| Endpoint | Descripción |
+|---|---|
+| `POST /issues/{key}/transition` | Texto libre → Claude → transición Jira. Consulta transiciones disponibles en tiempo real; 422 con lista si el estado no es alcanzable |
+| `POST /issues/{key}/worklog` | Texto libre → Claude → worklog Jira. Soporta `time_spent_seconds`, `comment` y `started` (ISO 8601) |
+
+**Archivos añadidos:**
+- `service/routes/transitions.py` + `service/routes/worklog.py`
+- `service/prompts/transition_issue.txt` + `service/prompts/log_work.txt`
+- Schemas: `TransitionIssueRequest/Payload/Response`, `LogWorkRequest/Payload/Response`
+- Jira client: `get_transitions()`, `transition_issue()`, `log_work()`
+- Claude client: `parse_transition_issue()`, `parse_log_work()`
+
+**Validado e2e:** ZNRX-68128 Open→In Progress→Done + 3 worklogs (7h registradas)
+
+---
+
 ## Fase 5 — Soporte multi-proyecto: tickets SAZ vinculados a ZNRX (futura)
 
 **Objetivo**: extender el sistema para crear tickets SAZ (*Solicitudes Release Zurich*) vinculados a un ticket ZNRX existente, cubriendo el flujo oficial de solicitudes DevOps dentro de un proyecto.

@@ -150,6 +150,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4 — MCP Server | ✅ Completa | SSE Docker + auth API key + RBAC + rate limit + output normalizado |
 | 4.1 — Ajustes e2e + TICKET_LANG | ✅ Completa | Campos ZNRX, priority IDs, prompts ES, idioma configurable |
 | 4.2 — Deuda técnica | ✅ Completa | JQL injection fix, audit MCP, rate limiter compartido, 52 unit tests |
+| 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
 | 5 — Soporte SAZ | Futura | Tickets SAZ vinculados a ZNRX — bloqueantes resueltos |
 | 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 

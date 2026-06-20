@@ -128,43 +128,65 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 
 ---
 
-## Fase 5 — Soporte multi-proyecto: tickets SAZ (futura)
+## Fase 5 — Soporte multi-proyecto: tickets SAZ vinculados a ZNRX (futura)
 
-**Objetivo**: extender el sistema para crear y gestionar tickets en el proyecto SAZ (`jira.zurich.com/projects/SAZ`), que corresponde a **Solicitudes Release Zurich** — canal oficial para solicitudes DevOps.
+**Objetivo**: extender el sistema para crear tickets SAZ (*Solicitudes Release Zurich*) vinculados a un ticket ZNRX existente, cubriendo el flujo oficial de solicitudes DevOps dentro de un proyecto.
 
 ### Contexto
 
-El proyecto SAZ se usa para solicitar:
-- Reinicios de servicios / ambientes
-- Despliegues (Docker, Kubernetes, etc.)
-- Gestión de repositorios Git
-- Accesos y permisos de infraestructura
-- Cualquier tarea de soporte DevOps
+Un ticket SAZ **siempre nace asociado a un ZNRX**. El flujo típico:
+1. Existe un ticket ZNRX (feature, bug, tarea de desarrollo)
+2. El equipo necesita apoyo de Release/DevOps: reinicio, despliegue, repo, accesos, etc.
+3. Se crea un SAZ en `jira.zurich.com/projects/SAZ` que queda **linked al ZNRX de origen**
+4. El equipo de Release trabaja el SAZ; el ZNRX avanza cuando el SAZ se resuelve
 
-Los tickets SAZ tienen campos y flujos de aprobación distintos a los tickets ZNRX. Antes de implementar, se requiere inspeccionar los tipos de issue y campos requeridos en el proyecto SAZ real.
+Tipos de solicitud SAZ habituales:
+- Reinicios de servicios / ambientes
+- Despliegues (Docker, Kubernetes, pipelines CI/CD)
+- Gestión de repositorios Git (creación, permisos, ramas)
+- Solicitudes de infraestructura (accesos, configs, certificados)
+
+### Restricción de diseño central
+
+El SAZ **no puede existir sin un ZNRX padre**. El sistema debe:
+- Recibir el `znrx_key` como input obligatorio
+- Crear el SAZ en el proyecto SAZ
+- Crear el issue link `SAZ → ZNRX` vía `POST /rest/api/2/issueLink`
+
+```
+ZNRX-1234  (proyecto: desarrollo/bugs)
+    └── SAZ-7176  (link type: "relates to" o equivalente en Jira Server)
+```
 
 ### Decisiones pendientes (requieren evaluación previa)
 
 | Decisión | Opciones |
 |---|---|
-| ¿Multi-project en mismo endpoint? | Un solo `POST /issues` con `project_key` param vs endpoints separados `/issues/znrx` y `/issues/saz` |
-| Campos obligatorios SAZ | Inspeccionar via `GET /rest/api/2/project/SAZ/issue` — pueden diferir de ZNRX |
-| Prompt Claude para SAZ | Prompt especializado para interpretar solicitudes DevOps (reinicios, deploys, repos) |
-| RBAC para SAZ | `update_jira_issue` sobre SAZ requiere rol `lead` o `system` — no `dev` |
+| Endpoint dedicado vs parámetro | `POST /issues/saz` con `znrx_key` obligatorio vs `POST /issues` con `project=SAZ&parent=ZNRX-XXX` |
+| Link type en Jira Server | Inspeccionar `GET /rest/api/2/issueLinkType` — puede ser "Relates", "Blocks", o tipo personalizado |
+| Campos obligatorios SAZ | Inspeccionar `GET /rest/api/2/issue/createmeta?projectKeys=SAZ` — pueden diferir de ZNRX |
+| Prompt Claude para SAZ | Especializado para lenguaje DevOps → campos SAZ + descripción del vínculo con el ZNRX |
+| RBAC | Crear SAZ requiere rol `lead` o superior (acción con impacto en Release) |
 
 ### Entregables estimados
-- `JIRA_PROJECT_KEY` evoluciona a `JIRA_DEFAULT_PROJECT` + soporte de `project` por llamada
-- Nuevo prompt Claude para clasificar solicitudes DevOps → campos SAZ
-- Herramienta MCP `create_saz_request` o parámetro `project` en `create_jira_issue`
+- `service/routes/saz.py` — endpoint `POST /issues/saz` con `znrx_key` requerido
+- `service/clients/jira_client.py` — función `create_saz_issue(znrx_key, payload)` + `link_issues(saz_key, znrx_key, link_type)`
+- `service/clients/claude_client.py` — `parse_saz_request(text, znrx_key)` con prompt DevOps
+- `service/prompts/saz_create.txt` — prompt especializado
+- Herramienta MCP `create_saz_request` con `znrx_key` y `text` como inputs
 - `.env.example` con `JIRA_SAZ_PROJECT_KEY=SAZ`
 
 ### Criterio de éxito
 ```bash
-python cli/main.py create "solicitar reinicio del servicio de autenticación en producción" --project SAZ
-# → SAZ-XXXXX creado en jira.zurich.com con tipo y campos correctos
+python cli/main.py create-saz ZNRX-1234 "solicitar reinicio del servicio de autenticación en producción"
+# 1. → SAZ-XXXXX creado en jira.zurich.com/projects/SAZ
+# 2. → issue link SAZ-XXXXX → ZNRX-1234 creado
+# → output: {"saz_key": "SAZ-XXXXX", "znrx_key": "ZNRX-1234", "status": "linked"}
 ```
 
-> **Bloqueante**: inspeccionar campos obligatorios del proyecto SAZ antes de implementar para evitar rechazos de la API Jira.
+> **Bloqueantes**:
+> 1. Inspeccionar `GET /rest/api/2/issueLinkType` en `jira.zurich.com` para conocer el link type correcto.
+> 2. Inspeccionar `GET /rest/api/2/issue/createmeta?projectKeys=SAZ` para campos obligatorios del proyecto SAZ.
 
 ---
 

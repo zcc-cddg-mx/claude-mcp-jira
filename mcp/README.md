@@ -5,19 +5,19 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 
 ## Herramientas disponibles
 
-| Herramienta | Descripción |
-|---|---|
-| `create_jira_issue` | Crea un ticket desde texto libre |
-| `update_jira_issue` | Actualiza un ticket desde texto libre |
-| `get_jira_issue` | Obtiene resumen de un ticket |
-| `search_jira_issues` | Búsqueda en lenguaje natural (máx. 50 resultados) |
+| Herramienta | Rol mínimo | Descripción |
+|---|---|---|
+| `create_jira_issue` | dev | Crea un ticket desde texto libre |
+| `update_jira_issue` | lead | Actualiza un ticket desde texto libre |
+| `get_jira_issue` | dev | Obtiene resumen de un ticket |
+| `search_jira_issues` | dev | Búsqueda en lenguaje natural (máx. 50 resultados) |
 
 ## Seguridad
 
 - **API key**: header `X-API-Key` requerido (`MCP_API_KEY` en `.env`)
 - **IP allowlist**: `MCP_ALLOWED_CIDRS` — solo hosts de la red Zurich
 - **RBAC**: roles `dev` / `lead` / `system` mapeados por API key (`MCP_KEY_ROLES`)
-- **Pre-validación**: input vacío o >2000 caracteres rechazado antes de llamar al backend
+- **Pre-validación**: input vacío o superior a `MCP_MAX_PAYLOAD_SIZE` caracteres rechazado antes de llamar al backend
 - **Rate limiting**: `MCP_RATE_LIMIT_MAX_CALLS` por API key (independiente del service layer)
 - **Output normalizado**: Claude solo recibe `{key, status}` o `{key, summary}` — nunca payloads internos completos
 
@@ -72,10 +72,12 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 | `MCP_ALLOWED_CIDRS` | `10.0.0.0/8,192.168.0.0/16` | CIDRs permitidos |
 | `MCP_KEY_ROLES` | `` | Mapeo `key:role` separado por comas |
 | `MCP_DEFAULT_ROLE` | `dev` | Rol cuando no hay mapeo |
+| `MCP_MAX_PAYLOAD_SIZE` | `2000` | Tamaño máximo de input en caracteres |
 | `MCP_RATE_LIMIT_MAX_CALLS` | `10` | Llamadas máximas por ventana |
 | `MCP_RATE_LIMIT_WINDOW` | `60` | Ventana en segundos |
 | `MCP_PORT` | `8001` | Puerto de escucha |
 | `MCP_SERVICE_TIMEOUT` | `30` | Timeout hacia el service layer (segundos) |
+| `JIRA_MAX_RESULTS` | `50` | Máximo de resultados en búsquedas (hard cap: 50) |
 
 ## RBAC — permisos por rol
 

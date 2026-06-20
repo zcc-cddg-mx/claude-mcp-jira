@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 load_dotenv()
 
-from .routes import actions_router, assign_router, comments_router, issues_router, labels_router, priority_router, search_router, summarize_router, transitions_router, update_router, worklog_router
+from .routes import actions_router, assign_router, clone_router, comments_router, issues_router, labels_router, priority_router, search_router, summarize_router, transitions_router, update_router, worklog_router
 
 _ENV = os.environ.get("APP_ENV", "dev").lower()
 _docs_url = "/docs" if _ENV == "dev" else None
@@ -29,6 +29,7 @@ app = FastAPI(
 
 app.include_router(actions_router)
 app.include_router(assign_router)
+app.include_router(clone_router)
 app.include_router(comments_router)
 app.include_router(issues_router)
 app.include_router(labels_router)

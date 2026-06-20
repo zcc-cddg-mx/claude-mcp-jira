@@ -27,10 +27,15 @@ relevantes y valores permitidos por proyecto.
 | Task | ✓ | Tipo principal — usar también para bugs y mejoras |
 | Story | ✓ | |
 | Epic | ✓ | |
+| Subtarea Historia | ✓ | Subtask — requiere `parent.key`; NO acepta `customfield_25832` ni `priority` |
 | Bug | ✗ | Validaciones de workflow bloquean creación vía API → usar Task |
 | RPA | ✓ (no verificado) | |
 | Data BI & Reporting | ✓ (no verificado) | |
 | Issue Pre/Post Producción | ✓ (no verificado) | |
+
+> **Subtasks screen**: Los issues de tipo `Subtarea Historia` usan un screen diferente al de los
+> issues de nivel superior. **`customfield_25832` (Línea de Servicio) y `priority` NO están
+> disponibles en ese screen** — enviarlos resulta en 400 "Field cannot be set".
 
 ### customfield_25832 — Línea de Servicio (obligatorio)
 

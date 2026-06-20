@@ -5,7 +5,7 @@ from pathlib import Path
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
-from ..schemas import AddCommentPayload, AssignIssuePayload, JiraIssuePayload, LabelsPayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
+from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -87,6 +87,20 @@ def parse_log_work(user_input: str) -> LogWorkPayload:
     prompt = _load_prompt("log_work").format(user_input=safe_input)
     raw = _strip_fences(_call(prompt))
     return LogWorkPayload(**_parse_json(raw, "log_work"))
+
+
+def parse_clone_issue(user_input: str, source: dict) -> CloneIssuePayload:
+    if not user_input.strip():
+        return CloneIssuePayload()
+    safe_input = sanitize(user_input)
+    f = source["fields"]
+    prompt = _load_prompt("clone_issue").format(
+        user_input=safe_input,
+        original_summary=sanitize(f.get("summary", "")),
+        original_description=sanitize(f.get("description", "") or ""),
+    )
+    raw = _strip_fences(_call(prompt))
+    return CloneIssuePayload(**_parse_json(raw, "clone_issue"))
 
 
 def parse_assign_issue(user_input: str) -> AssignIssuePayload:

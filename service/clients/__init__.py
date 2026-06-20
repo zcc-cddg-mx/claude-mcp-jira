@@ -1,6 +1,7 @@
 from .claude_client import (
     parse_add_comment,
     parse_assign_issue,
+    parse_clone_issue,
     parse_create_issue,
     parse_labels,
     parse_log_work,
@@ -13,6 +14,7 @@ from .claude_client import (
 from .jira_client import (
     add_comment,
     assign_issue,
+    clone_issue,
     create_issue,
     get_issue,
     get_labels,
@@ -31,8 +33,10 @@ from .sanitizer import sanitize
 __all__ = [
     "add_comment",
     "assign_issue",
+    "clone_issue",
     "parse_add_comment",
     "parse_assign_issue",
+    "parse_clone_issue",
     "parse_create_issue",
     "parse_labels",
     "parse_log_work",

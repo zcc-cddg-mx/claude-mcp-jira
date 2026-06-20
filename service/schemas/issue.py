@@ -141,6 +141,21 @@ class SetPriorityResponse(BaseModel):
     priority: str
 
 
+class CloneIssueRequest(BaseModel):
+    text: str = Field("", max_length=2000, example="clonar con título: revisión mensual de julio 2026")
+
+
+class CloneIssuePayload(BaseModel):
+    summary: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CloneIssueResponse(BaseModel):
+    source_key: str
+    new_key: str
+    summary: str
+
+
 class ActionsRequest(BaseModel):
     text: str = Field(..., min_length=3, max_length=2000, example="pon los labels: backend, api")
 

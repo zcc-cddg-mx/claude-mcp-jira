@@ -118,6 +118,46 @@ def log_work(key: str, payload: LogWorkPayload) -> None:
     _post_noret(f"/rest/api/2/issue/{key}/worklog", body)
 
 
+def clone_issue(source_key: str, source: dict, payload) -> str:
+    f = source["fields"]
+    issuetype = _ISSUETYPE_FALLBACK.get(f["issuetype"]["name"], f["issuetype"]["name"])
+    parent = f.get("parent")
+
+    summary = (payload.summary or f.get("summary", ""))[:100]
+    description = payload.description or f.get("description", "") or ""
+
+    fields: dict = {
+        "project": {"key": _JIRA_PROJECT_KEY},
+        "summary": summary,
+        "description": description,
+        "issuetype": {"name": issuetype},
+    }
+
+    if parent:
+        # Subtasks: link to parent, no customfield_25832/priority (not on subtask screen)
+        fields["parent"] = {"key": parent["key"]}
+    else:
+        # Top-level issues: Línea de Servicio required + priority
+        fields["customfield_25832"] = _LINEA_SERVICIO_BAU
+        priority_name = (f.get("priority") or {}).get("name", "Low")
+        priority_id = _PRIORITY_IDS.get(priority_name)
+        if priority_id:
+            fields["priority"] = {"id": priority_id}
+
+    new_key = _post("/rest/api/2/issue", {"fields": fields})["key"]
+
+    # Link types: "Cloners" id=10001 — outward="clones", inward="is cloned by"
+    # Only create link for top-level issues; subtasks are already tied to parent
+    if not parent:
+        _post_noret("/rest/api/2/issueLink", {
+            "type": {"id": "10001"},
+            "outwardIssue": {"key": source_key},
+            "inwardIssue": {"key": new_key},
+        })
+
+    return new_key
+
+
 def assign_issue(key: str, assignee: Optional[str]) -> None:
     # Jira Server uses PUT /rest/api/2/issue/{key}/assignee
     # Pass {"name": username} or {"name": None} to unassign

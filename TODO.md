@@ -28,8 +28,8 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Limpieza Jira
 
-- [ ] **Eliminar tickets `[MCP Claude Jira Test]` activos** (ZNRX-68147, 68154, 68161, 68162 y los creados por pruebas de link)
-  - JQL: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+- [x] **Eliminar tickets `[MCP Claude Jira Test]` activos** — 6 tickets eliminados el 2026-06-20
+  - ZNRX-68147, 68154, 68163 (top-level + subtasks), 68161, 68162, 68170 (subtasks directos)
   - Los tickets de hackathon (ZNRX-67942..67946) son histórico y no se tocan
 
 ---

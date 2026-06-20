@@ -35,19 +35,35 @@ cp .env.example .env  # fill in JIRA_PAT and uncomment REQUESTS_CA_BUNDLE
 ## Running
 
 ```bash
-# Via service layer (Fase 2+)
+# Via service layer
 docker compose up
-python cli/main.py create "bug login en producción prioridad alta"
 
 # Dev mode (no Docker)
 uvicorn service.main:app --reload
+
+# CLI commands
 python cli/main.py create "bug login en producción prioridad alta"
+python cli/main.py update PROJ-123 "cambiar prioridad a crítica"
+python cli/main.py summarize PROJ-123
+python cli/main.py list "mis bugs abiertos de esta semana"
 ```
 
-## Service layer security
+## Service layer — endpoints
 
-- `service/clients/sanitizer.py` — strips tokens, private IPs (RFC 1918), internal hostnames, stack traces before sending to Claude
+| Method | Path | Descripción |
+|---|---|---|
+| `POST` | `/issues` | Crear ticket desde texto libre |
+| `PATCH` | `/issues/{key}` | Actualizar ticket desde texto libre |
+| `GET` | `/issues/{key}/summary` | Resumen Claude del ticket |
+| `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50) |
+| `GET` | `/health` | Health check |
+
+## Service layer — security
+
+- `service/clients/sanitizer.py` — strips tokens, RFC 1918 IPs, internal hostnames, stack traces before sending to Claude
 - `service/audit.py` — JSON-lines audit log with `request_id` UUID per operation (`audit.log`)
+- `service/clients/jql_builder.py` — Claude → struct → safe JQL, MAX_RESULTS=50 always enforced
+- `service/clients/rate_limiter.py` — sliding window per user (`RATE_LIMIT_MAX_CALLS=30`, `RATE_LIMIT_WINDOW=60`)
 - `service/clients/jira_client.py` — PAT Bearer auth, corporate cert, `JIRA_TIMEOUT` (default 10s)
 
 ## Jira Auth (Server/DC)
@@ -76,6 +92,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Fase | Estado | Descripción |
 |---|---|---|
 | 1 — Prototipo CLI | ✅ Completa | `cli/main.py` — comando `create` directo |
-| 2 — Service Layer | ✅ Completa | FastAPI + sanitización extendida + audit log + timeouts |
-| 3 — Comandos completos | Pendiente | `update`, `summarize`, `list` + JQL controlado |
-| 4 — MCP Server | Pendiente | Servicio Docker con auth API key + RBAC |
+| 2 — Service Layer | ✅ Completa | FastAPI + sanitización + audit log + timeouts |
+| 3 — Comandos completos | ✅ Completa | `update`, `summarize`, `list` + JQL controlado + rate limiter |
+| 4 — MCP Server | Pendiente | Servicio Docker con auth API key + RBAC + pre-validación + output normalizado |
+| 5 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |

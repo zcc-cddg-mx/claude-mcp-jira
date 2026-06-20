@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–4.2 completas, MCP 10/10 e2e + 52 unit tests. Toda la deuda técnica resuelta.
+Estado general: Fases 1–4.2 completas + Docker validado (8/8 + 10/10). Toda la deuda técnica resuelta. Jira limpio.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -50,8 +50,7 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Limpieza Jira
 
-- [ ] **Eliminar tickets `[MCP Claude Jira Test]` activos** — solo los creados por el test runner
-  - JQL: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+- [x] **Eliminar tickets `[MCP Claude Jira Test]` activos** — 10 tickets + subtareas eliminados el 2026-06-19
   - Los tickets de hackathon (ZNRX-67942..67946) son histórico del proyecto y no se tocan
 
 ---
@@ -77,3 +76,6 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Limpieza Jira — 17 tickets de prueba eliminados (+ ~90 subtareas)
 - [x] Test e2e MCP server — 10/10 passed (`scripts/test-mcp.sh`)
 - [x] Fase 4.2 — Deuda técnica: JQL injection, audit MCP, rate limiter compartido, 52 unit tests, path conda portable
+- [x] Docker — build + e2e 8/8 service + 10/10 MCP (cert DER→PEM, puertos 18000/18001, JIRA_TIMEOUT=30)
+- [x] Bitácora de tests — `logs/test-results.jsonl` con campo `env` (dev/docker), `scripts/test-docker.sh`, `scripts/test-log.sh`
+- [x] Limpieza Jira — 10 tickets `[MCP Claude Jira Test]` + subtareas eliminados

@@ -1,6 +1,6 @@
 # Plan de Implementación: claude-mcp-jira
 
-Implementación incremental en 4 fases para red empresarial (Jira Server/Data Center en `jira.zurich.com`).
+Implementación incremental en 6 fases para red empresarial (Jira Server/Data Center en `jira.zurich.com`).
 Claude API accedida vía proxy LiteLLM interno de Zurich.
 
 > **Decisión de arquitectura**: se descartó el MCP oficial de Atlassian (solo funciona con Jira Cloud y viola políticas de red) y plataformas No-Code (N8N/Zapier). Se implementa integración propia con MCP server interno desplegable en Docker.
@@ -128,7 +128,47 @@ Claude Code: "crea un ticket para el bug que encontramos en auth"
 
 ---
 
-## Fase 5 — Observabilidad + Caching (opcional / futura)
+## Fase 5 — Soporte multi-proyecto: tickets SAZ (futura)
+
+**Objetivo**: extender el sistema para crear y gestionar tickets en el proyecto SAZ (`jira.zurich.com/projects/SAZ`), que corresponde a **Solicitudes Release Zurich** — canal oficial para solicitudes DevOps.
+
+### Contexto
+
+El proyecto SAZ se usa para solicitar:
+- Reinicios de servicios / ambientes
+- Despliegues (Docker, Kubernetes, etc.)
+- Gestión de repositorios Git
+- Accesos y permisos de infraestructura
+- Cualquier tarea de soporte DevOps
+
+Los tickets SAZ tienen campos y flujos de aprobación distintos a los tickets ZNRX. Antes de implementar, se requiere inspeccionar los tipos de issue y campos requeridos en el proyecto SAZ real.
+
+### Decisiones pendientes (requieren evaluación previa)
+
+| Decisión | Opciones |
+|---|---|
+| ¿Multi-project en mismo endpoint? | Un solo `POST /issues` con `project_key` param vs endpoints separados `/issues/znrx` y `/issues/saz` |
+| Campos obligatorios SAZ | Inspeccionar via `GET /rest/api/2/project/SAZ/issue` — pueden diferir de ZNRX |
+| Prompt Claude para SAZ | Prompt especializado para interpretar solicitudes DevOps (reinicios, deploys, repos) |
+| RBAC para SAZ | `update_jira_issue` sobre SAZ requiere rol `lead` o `system` — no `dev` |
+
+### Entregables estimados
+- `JIRA_PROJECT_KEY` evoluciona a `JIRA_DEFAULT_PROJECT` + soporte de `project` por llamada
+- Nuevo prompt Claude para clasificar solicitudes DevOps → campos SAZ
+- Herramienta MCP `create_saz_request` o parámetro `project` en `create_jira_issue`
+- `.env.example` con `JIRA_SAZ_PROJECT_KEY=SAZ`
+
+### Criterio de éxito
+```bash
+python cli/main.py create "solicitar reinicio del servicio de autenticación en producción" --project SAZ
+# → SAZ-XXXXX creado en jira.zurich.com con tipo y campos correctos
+```
+
+> **Bloqueante**: inspeccionar campos obligatorios del proyecto SAZ antes de implementar para evitar rechazos de la API Jira.
+
+---
+
+## Fase 6 — Observabilidad + Caching (opcional / futura)
 
 **Objetivo**: llevar el sistema a producción top-tier con métricas, trazas distribuidas y reducción de carga en Jira.
 

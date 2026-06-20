@@ -54,7 +54,8 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 2 — Service Layer | ✅ Completa | FastAPI + sanitización + audit log + timeouts |
 | 3 — Comandos completos | ✅ Completa | `update`, `summarize`, `list` + JQL controlado + rate limiter |
 | 4 — MCP Server | ✅ Completa | SSE Docker + auth API key + RBAC + rate limit + output normalizado |
-| 5 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
+| 5 — Soporte SAZ | Futura | Multi-proyecto: tickets Solicitudes Release Zurich (DevOps) |
+| 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 
 ## Documentación
 

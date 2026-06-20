@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1-4 + 4.1 completas, MCP 10/10 e2e. Deuda crítica y media resuelta.
+Estado general: Fases 1-4 + 4.1 completas, MCP 10/10 e2e. Toda la deuda técnica resuelta.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -48,11 +48,9 @@ Actualizar este archivo al completar o añadir tareas.
 
 #### Baja (mantenibilidad) — pendiente
 
-- [ ] **`scripts/dev.sh` — path miniconda hardcodeado**
-  - `/home/idavid/miniconda3/envs/claude-mcp-jira/bin/uvicorn` no es portable
-  - Solución: detectar desde `$CONDA_PREFIX` o `conda run -n claude-mcp-jira`
-- [ ] **0 tests unitarios** — sanitizer, jql_builder, auth, rbac sin cobertura; añadir `tests/` con pytest
-- [ ] **SSE handler — `import json` tardío** — ya corregido (movido al top de `server.py`)
+- [x] **`scripts/dev.sh` — path miniconda hardcodeado** — extraído a `scripts/_conda_env.sh`; detecta `$CONDA_PREFIX`, `conda info --base` o búsqueda en paths comunes
+- [x] **Tests unitarios** — `tests/` con pytest: 52 tests, 4 módulos (sanitizer, jql_builder, auth, rbac); cobertura de inyección JQL, RBAC y sanitización
+- [x] **SSE handler — `import json` tardío** — movido al top de `server.py`
 
 ### Limpieza Jira
 

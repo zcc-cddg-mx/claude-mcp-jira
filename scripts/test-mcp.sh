@@ -4,7 +4,8 @@
 # Validamos el service_client delegando directamente al service layer con x-user header.
 
 set -e
-PYTHON="/home/idavid/miniconda3/envs/claude-mcp-jira/bin/python"
+# shellcheck source=scripts/_conda_env.sh
+source "$(dirname "$0")/_conda_env.sh"
 SERVICE_URL="http://localhost:18000"
 MCP_URL="http://localhost:18001"
 PASS=0

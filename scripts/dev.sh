@@ -12,9 +12,8 @@
 set -e
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-CONDA_ENV="/home/idavid/miniconda3/envs/claude-mcp-jira"
-UVICORN="$CONDA_ENV/bin/uvicorn"
-PYTHON="$CONDA_ENV/bin/python"
+# shellcheck source=scripts/_conda_env.sh
+source "$(dirname "$0")/_conda_env.sh"
 
 SERVICE_PORT=18000
 MCP_PORT=18001

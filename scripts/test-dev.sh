@@ -4,8 +4,8 @@
 # Uso: bash scripts/test-dev.sh [--no-restart]
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PYTHON="/home/idavid/miniconda3/envs/claude-mcp-jira/bin/python"
-UVICORN="/home/idavid/miniconda3/envs/claude-mcp-jira/bin/uvicorn"
+# shellcheck source=scripts/_conda_env.sh
+source "$(dirname "$0")/_conda_env.sh"
 SERVICE_PORT=18000
 SERVICE_URL="http://localhost:$SERVICE_PORT"
 PIDFILE=/tmp/mcp-jira-service.pid

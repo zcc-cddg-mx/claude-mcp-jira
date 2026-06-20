@@ -82,6 +82,10 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 
 | Documento | Descripción |
 |---|---|
-| [`docs/jira-projects.md`](docs/jira-projects.md) | Metadata de proyectos Jira — restricciones, issuetypes, `TICKET_LANG` |
+| [`docs/jira-projects.md`](docs/jira-projects.md) | Proyectos Jira — restricciones, issuetypes, `TICKET_LANG` |
+| [`docs/jira-fields.md`](docs/jira-fields.md) | Campos requeridos y valores permitidos por proyecto |
+| [`docs/jira-roles.md`](docs/jira-roles.md) | Permisos efectivos del usuario en los 4 proyectos |
+| [`docs/jira-link-types.md`](docs/jira-link-types.md) | Tipos de link — recomendación SAZ→ZNRX |
+| [`docs/jira-workflows.md`](docs/jira-workflows.md) | Statuses y transiciones por proyecto |
 | [`arch/`](arch/README.md) | Arquitectura, plan de implementación, evaluaciones e informes técnicos |
 | [`mcp/README.md`](mcp/README.md) | Variables de entorno y configuración del MCP server |

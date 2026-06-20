@@ -26,3 +26,7 @@ arch/
 | `reports/mcp-technical-report.md` | Referencia técnica MCP para auditorías y evaluaciones futuras |
 | `evaluations/eval-plan-copilot-2.md` | Última evaluación — mejoras opcionales adoptadas y elementos diferidos a Fase 5 |
 | `../docs/jira-projects.md` | Metadata real de proyectos: ZNRX, AIPROJECTS, SAZ, SCRX |
+| `../docs/jira-fields.md` | Campos requeridos/opcionales y valores permitidos por proyecto |
+| `../docs/jira-roles.md` | Permisos efectivos del usuario en los 4 proyectos |
+| `../docs/jira-link-types.md` | 29 link types — recomendación para SAZ→ZNRX (Fase 5) |
+| `../docs/jira-workflows.md` | Statuses y transiciones por proyecto |

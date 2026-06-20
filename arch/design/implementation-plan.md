@@ -187,16 +187,16 @@ ZNRX-1234  (proyecto de desarrollo)
     └── SAZ-7177  (link: "relates to" — justificación/contexto del ZNRX)
 ```
 
-### Decisiones pendientes (requieren evaluación previa)
+### Decisiones resueltas ✅
 
-| Decisión | Opciones |
-|---|---|
-| Endpoint dedicado vs parámetro | `POST /issues/saz` con `znrx_key` obligatorio vs `POST /issues` con `project=SAZ&parent=ZNRX-XXX` |
-| Link type en Jira Server | Inspeccionar `GET /rest/api/2/issueLinkType` — puede ser "Relates", "Blocks", o tipo personalizado |
-| Campos obligatorios SAZ | Inspeccionar `GET /rest/api/2/issue/createmeta?projectKeys=SAZ` — pueden diferir de ZNRX |
-| Prompt Claude para SAZ | Especializado para lenguaje DevOps → campos SAZ + descripción del vínculo con el ZNRX |
-| RBAC | Crear SAZ requiere rol `lead` o superior (acción con impacto en Release) |
-| `znrx_key` obligatorio vs opcional | Campo opcional — el link solo se crea si se provee |
+| Decisión | Resolución | Fuente |
+|---|---|---|
+| Link type SAZ→ZNRX | **"Relates"** id `10003` — `POST /rest/api/2/issueLink` | `docs/jira-link-types.md` |
+| Campos obligatorios SAZ | Solo `reporter` (automático). Campo relevante: `customfield_25896` (Tipo de Solicitud) | `docs/jira-fields.md` |
+| Endpoint | `POST /issues/saz` con `znrx_key` opcional | decisión de diseño |
+| Prompt Claude para SAZ | Especializado en lenguaje DevOps + campo `customfield_25896` | pendiente de implementar |
+| RBAC | Rol `lead` o superior para crear SAZ | coherente con `update_jira_issue` |
+| `znrx_key` | Opcional — link solo se crea si se provee | confirmado |
 
 ### Entregables estimados
 - `service/routes/saz.py` — endpoint `POST /issues/saz` con `znrx_key` requerido
@@ -220,9 +220,7 @@ python cli/main.py create-saz "solicitar reinicio del servicio de autenticación
 # → output: {"saz_key": "SAZ-XXXXX", "znrx_key": "ZNRX-1234", "status": "linked"}
 ```
 
-> **Bloqueantes**:
-> 1. Inspeccionar `GET /rest/api/2/issueLinkType` en `jira.zurich.com` para conocer el link type correcto.
-> 2. Inspeccionar `GET /rest/api/2/issue/createmeta?projectKeys=SAZ` para campos obligatorios del proyecto SAZ.
+> **Bloqueantes resueltos** — ver `docs/jira-link-types.md` y `docs/jira-fields.md`. Fase 5 lista para implementar.
 
 ---
 

@@ -168,4 +168,4 @@ app = _make_app()
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("MCP_PORT", "8001"))
-    uvicorn.run("mcp.server:app", host="0.0.0.0", port=port, reload=False)
+    uvicorn.run("jira_mcp.server:app", host="0.0.0.0", port=port, reload=False)

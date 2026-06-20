@@ -33,7 +33,8 @@ bash scripts/dev.sh stop       # detener todo
 bash scripts/dev.sh restart    # reinicio limpio
 
 # Tests end-to-end contra jira.zurich.com
-bash scripts/test-dev.sh       # levanta service, corre 8 tests, reporta resultado
+bash scripts/test-dev.sh       # service layer: 8 tests (CLI → FastAPI → Jira)
+bash scripts/test-mcp.sh       # MCP server: 10 tests (SSE tools + auth + RBAC)
 
 # Comandos CLI
 python cli/main.py create "bug login en producción prioridad alta"
@@ -88,4 +89,4 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | [`docs/jira-link-types.md`](docs/jira-link-types.md) | Tipos de link — recomendación SAZ→ZNRX |
 | [`docs/jira-workflows.md`](docs/jira-workflows.md) | Statuses y transiciones por proyecto |
 | [`arch/`](arch/README.md) | Arquitectura, plan de implementación, evaluaciones e informes técnicos |
-| [`mcp/README.md`](mcp/README.md) | Variables de entorno y configuración del MCP server |
+| [`jira_mcp/README.md`](jira_mcp/README.md) | Variables de entorno y configuración del MCP server |

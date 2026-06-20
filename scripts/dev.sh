@@ -94,7 +94,8 @@ start_service() {
 start_mcp() {
     kill_port $MCP_PORT
     echo "[dev] Arrancando MCP server en :$MCP_PORT — log: $LOG_MCP"
-    nohup "$PYTHON" -m mcp.server \
+    # Usar uvicorn directamente para evitar importación circular con el paquete `mcp`
+    nohup "$UVICORN" jira_mcp.server:app --port $MCP_PORT --host 127.0.0.1 \
         > "$LOG_MCP" 2>&1 &
     echo $! > "$PIDFILE_MCP"
     wait_port $MCP_PORT "mcp"

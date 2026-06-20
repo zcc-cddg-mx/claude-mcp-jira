@@ -40,7 +40,7 @@ docker compose up
 
 # Dev mode (no Docker)
 uvicorn service.main:app --reload          # service on :8000
-python -m mcp.server                       # MCP on :8001
+python -m jira_mcp.server                  # MCP on :8001
 
 # CLI commands
 python cli/main.py create "bug login en producción prioridad alta"
@@ -120,7 +120,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Arquitectura general | `arch/design/architecture-overview.md` |
 | Plan de implementación | `arch/design/implementation-plan.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
-| MCP server config | `mcp/README.md` |
+| MCP server config | `jira_mcp/README.md` |
 | Evaluaciones externas | `arch/evaluations/` |
 
 ## Implementation phases

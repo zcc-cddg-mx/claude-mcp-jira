@@ -13,7 +13,7 @@ services:
   mcp:
     build:
       context: .
-      dockerfile: mcp/Dockerfile
+      dockerfile: jira_mcp/Dockerfile
     ports:
       - "8001:8001"
     env_file:

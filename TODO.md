@@ -15,11 +15,7 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Validación
 
-- [ ] **Test e2e MCP server** — validar el MCP server en dev (`:18001`) end-to-end
-  - Levantar con `bash scripts/dev.sh both`
-  - Conectar Claude Code via SSE (`http://localhost:18001/sse`)
-  - Verificar las 4 herramientas: `create_jira_issue`, `update_jira_issue`, `get_jira_issue`, `search_jira_issues`
-  - Verificar auth (API key), RBAC (rol dev vs lead) y rate limiting
+~~**Test e2e MCP server**~~ → Completado (ver sección Completado)
 
 ### Implementación
 
@@ -66,3 +62,4 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] `jira-workflows.md` — statuses y transiciones por proyecto
 - [x] Fase 5 — bloqueantes resueltos (link type + campos SAZ documentados)
 - [x] Limpieza Jira — 17 tickets de prueba eliminados (+ ~90 subtareas)
+- [x] Test e2e MCP server — 10/10 passed (`scripts/test-mcp.sh`)

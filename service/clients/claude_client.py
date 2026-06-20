@@ -44,18 +44,25 @@ def _call(prompt: str, max_tokens: int = 512) -> str:
     return message.content[0].text
 
 
+def _parse_json(raw: str, label: str) -> dict:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label}: invalid JSON from model ({exc.msg} at pos {exc.pos})") from exc
+
+
 def parse_create_issue(user_input: str) -> JiraIssuePayload:
     safe_input = sanitize(user_input)
     prompt = _load_prompt("create_issue").format(user_input=safe_input) + _lang_suffix()
     raw = _strip_fences(_call(prompt))
-    return JiraIssuePayload(**json.loads(raw))
+    return JiraIssuePayload(**_parse_json(raw, "create_issue"))
 
 
 def parse_update_issue(user_input: str) -> UpdateIssuePayload:
     safe_input = sanitize(user_input)
     prompt = _load_prompt("update_issue").format(user_input=safe_input) + _lang_suffix()
     raw = _strip_fences(_call(prompt))
-    return UpdateIssuePayload(**json.loads(raw))
+    return UpdateIssuePayload(**_parse_json(raw, "update_issue"))
 
 
 def summarize_issue(issue_data: dict) -> str:
@@ -68,4 +75,4 @@ def parse_search_query(user_input: str) -> SearchQueryStruct:
     safe_input = sanitize(user_input)
     prompt = _load_prompt("search_issues").format(user_input=safe_input)
     raw = _strip_fences(_call(prompt))
-    return SearchQueryStruct(**json.loads(raw))
+    return SearchQueryStruct(**_parse_json(raw, "search_issues"))

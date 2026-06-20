@@ -11,21 +11,29 @@ _DATE_RANGE_MAP = {
 }
 
 
+def _jql_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def build_jql(struct: SearchQueryStruct) -> tuple[str, int]:
     """Returns (jql_string, max_results). MAX_RESULTS is always capped at 50."""
     clauses = []
 
     if struct.assignee:
-        clauses.append(f'assignee = {struct.assignee}')
+        # currentUser() is a JQL function — pass through; otherwise quote
+        if struct.assignee == "currentUser()":
+            clauses.append("assignee = currentUser()")
+        else:
+            clauses.append(f'assignee = "{_jql_escape(struct.assignee)}"')
 
     if struct.status:
-        clauses.append(f'status = "{struct.status}"')
+        clauses.append(f'status = "{_jql_escape(struct.status)}"')
 
     if struct.issuetype:
-        clauses.append(f'issuetype = "{struct.issuetype}"')
+        clauses.append(f'issuetype = "{_jql_escape(struct.issuetype)}"')
 
     if struct.priority:
-        clauses.append(f'priority = "{struct.priority}"')
+        clauses.append(f'priority = "{_jql_escape(struct.priority)}"')
 
     if struct.date_range:
         since = _DATE_RANGE_MAP.get(struct.date_range)
@@ -33,8 +41,7 @@ def build_jql(struct: SearchQueryStruct) -> tuple[str, int]:
             clauses.append(f"created >= {since}")
 
     if struct.text_search:
-        safe = struct.text_search.replace('"', '\\"')
-        clauses.append(f'text ~ "{safe}"')
+        clauses.append(f'text ~ "{_jql_escape(struct.text_search)}"')
 
     jql = " AND ".join(clauses) if clauses else "project is not EMPTY"
     jql += " ORDER BY created DESC"

@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1-4 completas y validadas (service layer + CLI 8/8 e2e).
+Estado general: Fases 1-4 + 4.1 completas, MCP 10/10 e2e. Deuda crítica y media resuelta.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -32,9 +32,27 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Deuda técnica
 
+#### Crítica (seguridad) — resuelto en 2026-06-19
+
+- [x] **JQL injection** — `assignee`/`status`/`issuetype`/`priority` escapados con `_jql_escape()` en `jql_builder.py`
+- [x] **MCP sin audit log** — `jira_mcp/server.py` ahora escribe en `AUDIT_LOG_PATH` con `request_id` en cada tool call
+- [x] **HTTP responses exponen internals** — todas las rutas llaman `sanitize(str(e))` antes de incluir error en HTTPException detail
+
+#### Media (confiabilidad) — resuelto en 2026-06-19
+
+- [x] **JSON parsing sin control** — `json.loads()` envuelto en `_parse_json()` con `ValueError` descriptivo en `claude_client.py`
+- [x] **Rate limiter duplicado** — lógica extraída a `shared/rate_limiter.py`; `service/` y `jira_mcp/` usan `RateLimiter` con sus propios parámetros
+- [x] **Respuesta service layer sin validar** — `service_client.py` llama `_require()` para verificar campos esperados
+- [x] **SSE handler sin timeout** — `asyncio.wait_for(..., timeout=MCP_SSE_TIMEOUT)` en `handle_sse`; default 300s
+- [x] **Audit log sin rotación** — `service/audit.py` usa `RotatingFileHandler` (10 MB × 5 backups); configurable via `AUDIT_LOG_MAX_BYTES` / `AUDIT_LOG_BACKUP_COUNT`
+
+#### Baja (mantenibilidad) — pendiente
+
 - [ ] **`scripts/dev.sh` — path miniconda hardcodeado**
   - `/home/idavid/miniconda3/envs/claude-mcp-jira/bin/uvicorn` no es portable
-  - Solución sugerida: detectar desde `$CONDA_PREFIX` o `conda run -n claude-mcp-jira`
+  - Solución: detectar desde `$CONDA_PREFIX` o `conda run -n claude-mcp-jira`
+- [ ] **0 tests unitarios** — sanitizer, jql_builder, auth, rbac sin cobertura; añadir `tests/` con pytest
+- [ ] **SSE handler — `import json` tardío** — ya corregido (movido al top de `server.py`)
 
 ### Limpieza Jira
 

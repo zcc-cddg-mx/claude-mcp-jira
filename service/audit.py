@@ -1,10 +1,21 @@
 import json
+import logging
+import logging.handlers
 import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
-_LOG_PATH = Path(os.environ.get("AUDIT_LOG_PATH", "audit.log"))
+_LOG_PATH = os.environ.get("AUDIT_LOG_PATH", "audit.log")
+_MAX_BYTES = int(os.environ.get("AUDIT_LOG_MAX_BYTES", str(10 * 1024 * 1024)))  # 10 MB
+_BACKUP_COUNT = int(os.environ.get("AUDIT_LOG_BACKUP_COUNT", "5"))
+
+_handler = logging.handlers.RotatingFileHandler(
+    _LOG_PATH, maxBytes=_MAX_BYTES, backupCount=_BACKUP_COUNT, encoding="utf-8"
+)
+_audit_logger = logging.getLogger("jira_mcp.audit_file")
+_audit_logger.addHandler(_handler)
+_audit_logger.setLevel(logging.INFO)
+_audit_logger.propagate = False
 
 
 def new_request_id() -> str:
@@ -33,5 +44,4 @@ def log(
         "status": status,
         "error": error,
     }
-    with _LOG_PATH.open("a") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    _audit_logger.info(json.dumps(entry, ensure_ascii=False))

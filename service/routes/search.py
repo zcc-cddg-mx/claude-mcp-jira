@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from ..audit import log, new_request_id
 from ..clients import build_jql, parse_search_query, rate_limit_check, search_issues
+from ..clients.sanitizer import sanitize
 from ..schemas import SearchRequest, SearchResponse
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -25,14 +26,14 @@ async def search_issues_endpoint(
     except Exception as e:
         log(request_id=rid, user=x_user, action="search_issues", input_text=body.query,
             status="error", error=f"claude: {e}")
-        raise HTTPException(status_code=422, detail=f"Query parsing failed: {e}")
+        raise HTTPException(status_code=422, detail=f"Query parsing failed: {sanitize(str(e))}")
 
     try:
         issues = search_issues(jql, max_results)
     except Exception as e:
         log(request_id=rid, user=x_user, action="search_issues", input_text=body.query,
             claude_payload={"jql": jql}, status="error", error=f"jira: {e}")
-        raise HTTPException(status_code=502, detail=f"Jira request failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Jira request failed: {sanitize(str(e))}")
 
     log(
         request_id=rid,

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from ..audit import log, new_request_id
 from ..clients import create_issue, parse_create_issue
+from ..clients.sanitizer import sanitize
 from ..schemas import CreateIssueRequest, CreateIssueResponse
 
 router = APIRouter(prefix="/issues", tags=["issues"])
@@ -19,14 +20,14 @@ async def create_issue_endpoint(
     except Exception as e:
         log(request_id=rid, user=x_user, action="create_issue", input_text=body.text,
             status="error", error=f"claude: {e}")
-        raise HTTPException(status_code=422, detail=f"Claude parsing failed: {e}")
+        raise HTTPException(status_code=422, detail=f"Claude parsing failed: {sanitize(str(e))}")
 
     try:
         key = create_issue(payload)
     except Exception as e:
         log(request_id=rid, user=x_user, action="create_issue", input_text=body.text,
             claude_payload=payload.model_dump(), status="error", error=f"jira: {e}")
-        raise HTTPException(status_code=502, detail=f"Jira request failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Jira request failed: {sanitize(str(e))}")
 
     log(
         request_id=rid,

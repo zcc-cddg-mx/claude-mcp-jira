@@ -14,11 +14,18 @@ def _client(user: str) -> httpx.Client:
     )
 
 
+def _require(d: dict, *keys: str, endpoint: str) -> None:
+    missing = [k for k in keys if k not in d]
+    if missing:
+        raise ValueError(f"{endpoint}: missing fields {missing} in response")
+
+
 def create_issue(text: str, user: str) -> dict:
     with _client(user) as c:
         r = c.post("/issues", json={"text": text})
         r.raise_for_status()
         d = r.json()
+        _require(d, "key", endpoint="POST /issues")
         return {"key": d["key"], "status": "created"}
 
 
@@ -34,6 +41,7 @@ def get_issue(key: str, user: str) -> dict:
         r = c.get(f"/issues/{key}/summary")
         r.raise_for_status()
         d = r.json()
+        _require(d, "key", "summary", endpoint=f"GET /issues/{key}/summary")
         return {"key": d["key"], "summary": d["summary"]}
 
 
@@ -42,6 +50,7 @@ def search_issues(query: str, user: str) -> dict:
         r = c.post("/issues/search", json={"query": query})
         r.raise_for_status()
         d = r.json()
+        _require(d, "total", "issues", endpoint="POST /issues/search")
         return {
             "total": d["total"],
             "issues": [

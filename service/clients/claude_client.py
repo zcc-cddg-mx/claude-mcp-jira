@@ -11,9 +11,19 @@ _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 _MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 
+_LANG_INSTRUCTION = {
+    "es": "Genera el resumen y la descripción del ticket en español.",
+    "en": "Generate the ticket summary and description in English.",
+}
+
 
 def _load_prompt(name: str) -> str:
     return (_PROMPTS_DIR / f"{name}.txt").read_text()
+
+
+def _lang_suffix() -> str:
+    lang = os.environ.get("TICKET_LANG", "es").lower()
+    return "\n" + _LANG_INSTRUCTION.get(lang, _LANG_INSTRUCTION["es"])
 
 
 def _strip_fences(raw: str) -> str:
@@ -36,14 +46,14 @@ def _call(prompt: str, max_tokens: int = 512) -> str:
 
 def parse_create_issue(user_input: str) -> JiraIssuePayload:
     safe_input = sanitize(user_input)
-    prompt = _load_prompt("create_issue").format(user_input=safe_input)
+    prompt = _load_prompt("create_issue").format(user_input=safe_input) + _lang_suffix()
     raw = _strip_fences(_call(prompt))
     return JiraIssuePayload(**json.loads(raw))
 
 
 def parse_update_issue(user_input: str) -> UpdateIssuePayload:
     safe_input = sanitize(user_input)
-    prompt = _load_prompt("update_issue").format(user_input=safe_input)
+    prompt = _load_prompt("update_issue").format(user_input=safe_input) + _lang_suffix()
     raw = _strip_fences(_call(prompt))
     return UpdateIssuePayload(**json.loads(raw))
 

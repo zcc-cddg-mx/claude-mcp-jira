@@ -101,32 +101,57 @@ python cli/main.py list "mis bugs abiertos de esta semana"
 
 ## Fase 4 — MCP Server (servicio deployable interno) + Auth + RBAC
 
-**Objetivo**: exponer la integración como MCP server desplegable en red interna con autenticación y control de acceso por rol.
+**Objetivo**: exponer la integración como MCP server desplegable en red interna con autenticación, control de acceso por rol y robustez ante abuso.
 
 ### Entregables
 - `mcp/server.py` — SDK `mcp`, 4 herramientas, delega al service layer
 - Auth MCP: API key interna + IP allowlist
-- RBAC básico: `dev` (crear/comentar), `lead` (actualizar/priorizar), `system` (todo)
+- RBAC básico: `dev` (crear/consultar), `lead` (actualizar/priorizar), `system` (todo)
+- Pre-validación ligera en cada herramienta MCP (antes de llamar al backend)
+- Rate limiting por API key en el MCP server
+- Output normalizado — Claude solo recibe `{key, status}`, nunca el payload completo
 - `mcp/Dockerfile` — imagen deployable en red interna
 - Configuración para `.claude/settings.json`
-- (Opcional) Policy Engine: aprobación humana para acciones críticas
 
 ### Tareas
 1. Instalar SDK MCP (`pip install mcp`)
 2. Crear `mcp/server.py` con herramientas: `create_jira_issue`, `update_jira_issue`, `search_jira_issues`, `get_jira_issue`
 3. Cada herramienta delega al service layer FastAPI (no duplicar lógica)
-4. Middleware de autenticación: `X-API-Key` header + lista de IPs permitidas
+4. Middleware de autenticación: `X-API-Key` header + IP allowlist (`10.0.0.0/8`, `192.168.0.0/16`)
 5. Middleware RBAC: mapeo `user → rol → acciones permitidas`
-6. `mcp/Dockerfile` — servicio independiente deployable
-7. (Opcional) Policy Engine: `enforce_policy()` — si `priority == Critical` o acción destructiva → `require_approval()`
-8. Documentar configuración SSE interna en `mcp/README.md`
+6. Pre-validación ligera por herramienta: longitud de input, tipos requeridos — rechazar antes de llamar al backend
+7. Rate limiting por API key: `max_calls = 10/min` por defecto, configurable
+8. Normalizar respuestas: devolver solo campos esenciales al LLM
+9. `mcp/Dockerfile` — servicio independiente deployable
+10. (Opcional) Policy Engine: `enforce_policy()` — si `priority == Critical` → `require_approval()`
+11. Documentar configuración SSE interna en `mcp/README.md`
+
+### Pre-validación ligera (defensa en profundidad)
+```python
+# Bloquear abuso antes de llegar al backend
+if len(arguments["text"]) > 2000:
+    raise ValueError("input demasiado largo — máximo 2000 caracteres")
+if not arguments.get("text", "").strip():
+    raise ValueError("input vacío")
+```
+
+### Rate limiting por API key
+```python
+@rate_limit(key=api_key, max_calls=10, window_seconds=60)
+async def create_jira_issue(arguments): ...
+```
+
+### Output normalizado
+```python
+# Nunca reenviar el payload completo al LLM
+return {"key": result["key"], "status": "created"}   # create
+return {"key": key, "status": "updated"}              # update
+return {"issues": [{"key": i["key"], "summary": i["summary"]} for i in results]}  # search
+```
 
 ### Auth MCP
 ```python
-# API key interna — nunca expuesta fuera de la red
-X-API-Key: <clave-interna>
-
-# IP allowlist — solo hosts de la red Zurich
+X-API-Key: <clave-interna>   # header requerido en cada llamada
 ALLOWED_IPS = ["10.0.0.0/8", "192.168.0.0/16"]
 ```
 
@@ -162,8 +187,35 @@ def enforce_policy(action):
 ### Criterio de éxito
 ```
 Claude Code: "crea un ticket para el bug que encontramos en auth"
-→ Claude invoca create_jira_issue (MCP interno, auth OK) → PROJ-003 creado
+→ Claude invoca create_jira_issue (auth OK, pre-validación OK, rate limit OK)
+→ MCP delega a service layer → PROJ-003 creado
+→ Claude recibe: {"key": "PROJ-003", "status": "created"}
 ```
+
+---
+
+## Fase 5 — Observabilidad + Caching (opcional / futura)
+
+**Objetivo**: llevar el sistema de ~85% a producción top-tier con métricas, trazas distribuidas y reducción de carga en Jira.
+
+> Esta fase no es bloqueante para producción. Activar cuando el volumen de uso lo justifique.
+
+### Entregables
+- Métricas Prometheus expuestas en `/metrics` (service layer + MCP)
+- Trazas distribuidas con OpenTelemetry — correlación entre MCP, service layer y Jira
+- Caching de 30-60s en `search_jira_issues` — reduce carga repetitiva en Jira
+
+### Tareas
+1. Instrumentar FastAPI con `prometheus-fastapi-instrumentator`
+2. Agregar `opentelemetry-sdk` con exportador configurable (Jaeger / Zipkin)
+3. Propagar `trace_id` desde MCP → service layer → Jira (header `X-Trace-ID`)
+4. Implementar cache en memoria (TTL 30-60s) para resultados de búsqueda
+5. Dashboard Grafana básico: latencia, errores, tickets creados/día
+
+### Por qué es opcional
+- `request_id` UUID ya cubre trazabilidad básica para el volumen inicial
+- El caching requiere decisiones sobre invalidación que dependen del uso real
+- Prometheus/OTel requieren infraestructura adicional (Grafana, Jaeger) no disponible en todos los entornos Zurich
 
 ---
 
@@ -231,3 +283,9 @@ python-dotenv
 | Trazabilidad | `request_id` UUID por operación | Correlacionar logs entre CLI, service y Jira |
 | Auth MCP | API key + IP allowlist | Expone capacidades críticas; no debe ser acceso abierto |
 | RBAC MCP | dev / lead / system | Principio de menor privilegio por rol |
+| Pre-validación MCP | Ligera, antes de llamar al backend | Bloquear abuso (input >2000 chars, vacíos) sin latencia de red |
+| Rate limiting | En MCP (por API key) + FastAPI (por endpoint) | Defensa en profundidad — dos capas independientes |
+| Output MCP | Normalizado (`{key, status}` solamente) | Evitar filtración de datos internos hacia el LLM |
+| Session context | `request_id` UUID (sin estado de sesión completo) | Trazabilidad suficiente; sesiones completas añaden complejidad innecesaria en esta etapa |
+| Observabilidad | Opcional — Fase 5 | Requiere infra adicional; `request_id` cubre el MVP |
+| Caching | Opcional — Fase 5 | `search_jira_issues` 30-60s TTL cuando el volumen lo justifique |

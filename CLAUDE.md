@@ -39,6 +39,14 @@ claude-jira summarize PROJ-123
 claude-jira list "mis tickets abiertos"
 ```
 
+## Setup
+
+```bash
+conda env create -f environment.yml
+conda activate claude-mcp-jira
+cp .env.example .env  # completar con credenciales reales
+```
+
 ## Auth
 
 - Jira Cloud: API Token + Basic Auth (`email:api_token`)

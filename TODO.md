@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1-4 + 4.1 completas, MCP 10/10 e2e. Toda la deuda técnica resuelta.
+Estado general: Fases 1–4.2 completas, MCP 10/10 e2e + 52 unit tests. Toda la deuda técnica resuelta.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -12,10 +12,6 @@ Actualizar este archivo al completar o añadir tareas.
 ---
 
 ## Pendiente
-
-### Validación
-
-~~**Test e2e MCP server**~~ → Completado (ver sección Completado)
 
 ### Implementación
 
@@ -46,7 +42,7 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] **SSE handler sin timeout** — `asyncio.wait_for(..., timeout=MCP_SSE_TIMEOUT)` en `handle_sse`; default 300s
 - [x] **Audit log sin rotación** — `service/audit.py` usa `RotatingFileHandler` (10 MB × 5 backups); configurable via `AUDIT_LOG_MAX_BYTES` / `AUDIT_LOG_BACKUP_COUNT`
 
-#### Baja (mantenibilidad) — pendiente
+#### Baja (mantenibilidad) — resuelto en 2026-06-19
 
 - [x] **`scripts/dev.sh` — path miniconda hardcodeado** — extraído a `scripts/_conda_env.sh`; detecta `$CONDA_PREFIX`, `conda info --base` o búsqueda en paths comunes
 - [x] **Tests unitarios** — `tests/` con pytest: 52 tests, 4 módulos (sanitizer, jql_builder, auth, rbac); cobertura de inyección JQL, RBAC y sanitización
@@ -80,3 +76,4 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Fase 5 — bloqueantes resueltos (link type + campos SAZ documentados)
 - [x] Limpieza Jira — 17 tickets de prueba eliminados (+ ~90 subtareas)
 - [x] Test e2e MCP server — 10/10 passed (`scripts/test-mcp.sh`)
+- [x] Fase 4.2 — Deuda técnica: JQL injection, audit MCP, rate limiter compartido, 52 unit tests, path conda portable

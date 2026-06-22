@@ -8,6 +8,7 @@ _ISSUE_TYPE_PATTERN = "^(Bug|Task|Story|Improvement)$"
 
 class CreateIssueRequest(BaseModel):
     text: str = Field(..., min_length=5, max_length=2000, example="bug en el login de producción, prioridad alta")
+    project: Optional[str] = Field(None, min_length=2, max_length=20, example="AIPROJECTS")
 
 
 class JiraIssuePayload(BaseModel):
@@ -47,6 +48,7 @@ class SummarizeIssueResponse(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=3, max_length=500, example="mis bugs abiertos de esta semana")
+    project: Optional[str] = Field(None, min_length=2, max_length=20, example="AIPROJECTS")
 
 
 class SearchQueryStruct(BaseModel):

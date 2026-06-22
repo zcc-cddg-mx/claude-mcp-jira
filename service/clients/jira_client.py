@@ -5,10 +5,10 @@ from typing import Optional
 import requests
 
 from ..schemas import IssueResult, JiraIssuePayload, LogWorkPayload, SAZIssuePayload, TransitionPayload, UpdateIssuePayload
+from .project_config import get_config, resolve_project
 
 _JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 _JIRA_PAT = os.environ.get("JIRA_PAT", "")
-_JIRA_PROJECT_KEY = os.environ.get("JIRA_PROJECT_KEY", "")
 _JIRA_SAZ_PROJECT_KEY = os.environ.get("JIRA_SAZ_PROJECT_KEY", "SAZ")
 _CA_BUNDLE = os.environ.get("REQUESTS_CA_BUNDLE", True)
 _TIMEOUT = int(os.environ.get("JIRA_TIMEOUT", "10"))
@@ -18,21 +18,6 @@ _HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
 }
-
-# ZNRX project requires customfield_25832 ("Línea de Servicio") on top-level issues.
-# "BAU" (id 44461) is the standard value for development work.
-_LINEA_SERVICIO_BAU = {"id": "44461"}
-
-# ZNRX does not accept priority by name — must use ID.
-# ZNRX only allows: Highest (1), High (2), Low (4). Any other value is omitted.
-# "Bug" issuetype has additional workflow validations in ZNRX that block creation via API;
-# fall back to "Task" and preserve intent in summary/description.
-_PRIORITY_IDS = {
-    "Highest": "1",
-    "High": "2",
-    "Low": "4",
-}
-_ISSUETYPE_FALLBACK = {"Bug": "Task", "Improvement": "Task"}
 
 
 def _get(path: str) -> dict:
@@ -57,18 +42,23 @@ def _post_noret(path: str, body: dict) -> None:
     r.raise_for_status()
 
 
-def create_issue(payload: JiraIssuePayload) -> str:
-    issuetype = _ISSUETYPE_FALLBACK.get(payload.issueType, payload.issueType)
-    priority_id = _PRIORITY_IDS.get(payload.priority)
+def create_issue(payload: JiraIssuePayload, project_key: Optional[str] = None) -> str:
+    key = resolve_project(project_key)
+    cfg = get_config(key)
+    issuetype = cfg["issuetype_fallback"].get(payload.issueType, payload.issueType)
     fields: dict = {
-        "project": {"key": _JIRA_PROJECT_KEY},
+        "project": {"key": key},
         "summary": payload.summary,
         "description": payload.description,
         "issuetype": {"name": issuetype},
-        "customfield_25832": _LINEA_SERVICIO_BAU,
     }
-    if priority_id:
-        fields["priority"] = {"id": priority_id}
+    fields.update(cfg["required_custom"])
+    if cfg["priority_format"] == "id":
+        priority_id = cfg["priority_ids"].get(payload.priority)
+        if priority_id:
+            fields["priority"] = {"id": priority_id}
+    else:
+        fields["priority"] = {"name": payload.priority}
     return _post("/rest/api/2/issue", {"fields": fields})["key"]
 
 
@@ -76,16 +66,24 @@ def get_issue(key: str) -> dict:
     return _get(f"/rest/api/2/issue/{key}")
 
 
+def _project_from_key(issue_key: str) -> str:
+    return issue_key.split("-")[0].upper()
+
+
 def update_issue(key: str, payload: UpdateIssuePayload) -> None:
+    cfg = get_config(_project_from_key(key))
     fields: dict = {}
     if payload.summary is not None:
         fields["summary"] = payload.summary
     if payload.description is not None:
         fields["description"] = payload.description
     if payload.priority is not None:
-        priority_id = _PRIORITY_IDS.get(payload.priority)
-        if priority_id:
-            fields["priority"] = {"id": priority_id}
+        if cfg["priority_format"] == "id":
+            priority_id = cfg["priority_ids"].get(payload.priority)
+            if priority_id:
+                fields["priority"] = {"id": priority_id}
+        else:
+            fields["priority"] = {"name": payload.priority}
 
     if fields:
         _put(f"/rest/api/2/issue/{key}", {"fields": fields})
@@ -202,9 +200,10 @@ def assign_issue(key: str, assignee: Optional[str]) -> None:
 
 
 def set_priority(key: str, priority: str) -> None:
-    priority_id = _PRIORITY_IDS.get(priority)
-    if priority_id:
-        fields: dict = {"priority": {"id": priority_id}}
+    cfg = get_config(_project_from_key(key))
+    if cfg["priority_format"] == "id":
+        priority_id = cfg["priority_ids"].get(priority)
+        fields: dict = {"priority": {"id": priority_id}} if priority_id else {"priority": {"name": priority}}
     else:
         fields = {"priority": {"name": priority}}
     _put(f"/rest/api/2/issue/{key}", {"fields": fields})

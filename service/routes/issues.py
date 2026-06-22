@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Header, HTTPException
 
 from ..audit import log, new_request_id
-from ..clients import create_issue, parse_create_issue
+from ..clients import create_issue, parse_create_issue, rate_limit_check
+from ..clients.project_config import resolve_project
 from ..clients.sanitizer import sanitize
 from ..schemas import CreateIssueRequest, CreateIssueResponse
 
@@ -16,14 +17,24 @@ async def create_issue_endpoint(
     rid = new_request_id()
 
     try:
-        payload = parse_create_issue(body.text)
+        rate_limit_check(x_user)
+    except RuntimeError as e:
+        raise HTTPException(status_code=429, detail=str(e))
+
+    try:
+        project_key = resolve_project(body.project)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        payload = parse_create_issue(body.text, project_key)
     except Exception as e:
         log(request_id=rid, user=x_user, action="create_issue", input_text=body.text,
             status="error", error=f"claude: {e}")
         raise HTTPException(status_code=422, detail=f"Claude parsing failed: {sanitize(str(e))}")
 
     try:
-        key = create_issue(payload)
+        key = create_issue(payload, project_key)
     except Exception as e:
         log(request_id=rid, user=x_user, action="create_issue", input_text=body.text,
             claude_payload=payload.model_dump(), status="error", error=f"jira: {e}")

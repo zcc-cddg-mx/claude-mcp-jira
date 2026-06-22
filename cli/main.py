@@ -23,12 +23,18 @@ def _client() -> httpx.Client:
 
 
 @app.command()
-def create(text: str = typer.Argument(..., help="Descripción del ticket en lenguaje natural")):
+def create(
+    text: str = typer.Argument(..., help="Descripción del ticket en lenguaje natural"),
+    project: str = typer.Option(None, "--project", "-p", help="Proyecto Jira (ej. ZNRX, AIPROJECTS, SCRX)"),
+):
     """Crea un ticket Jira a partir de texto libre."""
     typer.echo(f"Procesando: {text}")
+    body = {"text": text}
+    if project:
+        body["project"] = project.upper()
     with _client() as client:
         try:
-            r = client.post("/issues", json={"text": text})
+            r = client.post("/issues", json=body)
             r.raise_for_status()
         except httpx.HTTPStatusError:
             _handle_error(r, "create")
@@ -82,12 +88,18 @@ def summarize(key: str = typer.Argument(..., help="Clave del ticket (ej. PROJ-12
 
 
 @app.command()
-def list_issues(query: str = typer.Argument(..., help="Búsqueda en lenguaje natural")):
+def list_issues(
+    query: str = typer.Argument(..., help="Búsqueda en lenguaje natural"),
+    project: str = typer.Option(None, "--project", "-p", help="Proyecto Jira (ej. ZNRX, AIPROJECTS, SCRX)"),
+):
     """Busca tickets Jira usando lenguaje natural."""
     typer.echo(f"Buscando: {query}")
+    body = {"query": query}
+    if project:
+        body["project"] = project.upper()
     with _client() as client:
         try:
-            r = client.post("/issues/search", json={"query": query})
+            r = client.post("/issues/search", json=body)
             r.raise_for_status()
         except httpx.HTTPStatusError:
             _handle_error(r, "list")

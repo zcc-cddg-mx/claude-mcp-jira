@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 7 (Multi-proyecto) o Fase 8 (UI).
+Estado general: Fases 1–5 y 7 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 8 (UI, opcional).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -14,10 +14,6 @@ Actualizar este archivo al completar o añadir tareas.
 ## Pendiente
 
 ### Implementación
-
-- [ ] **Fase 7 — Multi-proyecto** *(futura — evaluar antes de implementar)*
-  - Ver `arch/evaluations/eval-multiproject-copilot.md`
-  - Objetivo: routing dinámico de proyecto; configuración por proyecto
 
 - [ ] **Fase 8 — UI** *(futura — evaluar antes de implementar)*
   - Ver `arch/evaluations/eval-ui-copilot.md`
@@ -77,3 +73,12 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] MCP tool `link_jira_issues` (dev)
 - [x] Limpieza Jira — 6 tickets `[MCP Claude Jira Test]` eliminados el 2026-06-20
   - ZNRX-68147, 68154, 68163 (top-level + subtasks), 68161, 68162, 68170 (subtasks directos)
+- [x] Fase 7 — Multi-proyecto:
+  - [x] `service/clients/project_config.py` — configs ZNRX/AIPROJECTS/SCRX + `resolve_project()` + `get_config()`
+  - [x] `project` opcional en `POST /issues` y `POST /issues/search`
+  - [x] `create_issue()` y `update_issue()` y `set_priority()` usan config del proyecto
+  - [x] `build_jql()` acepta `project_key` para acotar búsqueda
+  - [x] `JIRA_DEFAULT_PROJECT` + `JIRA_ALLOWED_PROJECTS` en `.env`/`.env.example`
+  - [x] MCP tools `create_jira_issue` y `search_jira_issues` aceptan `project` opcional
+  - [x] CLI `create` y `list-issues` aceptan `--project` flag
+  - [x] `TICKET_LANG` per-proyecto según `project_config.py`

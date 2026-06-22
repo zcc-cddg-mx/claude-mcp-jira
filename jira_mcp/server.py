@@ -61,6 +61,10 @@ def _make_tools() -> list[Tool]:
                         "description": "Natural language description of the issue to create",
                         "maxLength": max_len,
                     },
+                    "project": {
+                        "type": "string",
+                        "description": "Optional Jira project key (e.g. ZNRX, AIPROJECTS, SCRX). Defaults to the configured default project.",
+                    },
                 },
                 "required": ["text"],
             },
@@ -102,6 +106,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Natural language search query",
                         "maxLength": search_max,
+                    },
+                    "project": {
+                        "type": "string",
+                        "description": "Optional Jira project key to scope the search (e.g. ZNRX, AIPROJECTS, SCRX).",
                     },
                 },
                 "required": ["query"],
@@ -234,13 +242,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     # Dispatch — delegate everything to service layer
     try:
         if name == "create_jira_issue":
-            result = service_client.create_issue(arguments["text"], user)
+            result = service_client.create_issue(arguments["text"], user, arguments.get("project"))
         elif name == "update_jira_issue":
             result = service_client.update_issue(arguments["key"], arguments["text"], user)
         elif name == "get_jira_issue":
             result = service_client.get_issue(arguments["key"], user)
         elif name == "search_jira_issues":
-            result = service_client.search_issues(arguments["query"], user)
+            result = service_client.search_issues(arguments["query"], user, arguments.get("project"))
         elif name == "assign_jira_issue":
             result = service_client.assign_issue(arguments["key"], arguments["text"], user)
         elif name == "set_priority_jira_issue":

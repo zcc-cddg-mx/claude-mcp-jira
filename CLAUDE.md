@@ -78,10 +78,10 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 
 | Method | Path | Descripción |
 |---|---|---|
-| `POST` | `/issues` | Crear ticket desde texto libre |
+| `POST` | `/issues` | Crear ticket desde texto libre; `project` opcional (default: `JIRA_DEFAULT_PROJECT`) |
 | `PATCH` | `/issues/{key}` | Actualizar ticket desde texto libre |
 | `GET` | `/issues/{key}/summary` | Resumen Claude del ticket |
-| `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50) |
+| `POST` | `/issues/search` | Búsqueda NL → JQL controlado (MAX 50); `project` opcional para acotar |
 | `POST` | `/issues/{key}/transition` | Cambiar estado (texto libre → Claude → transición Jira) |
 | `POST` | `/issues/{key}/worklog` | Registrar horas trabajadas (texto libre → Claude → worklog) |
 | `POST` | `/issues/{key}/comments` | Añadir comentario (texto libre → Claude → comentario Jira) |
@@ -169,6 +169,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h |
 | 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
+| 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; `project_config.py`; validación `JIRA_ALLOWED_PROJECTS` |
+| 8 — UI | Futura | Interfaz web para usuarios no técnicos — evaluar antes de implementar |
 
 ## Test tickets (limpieza)
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from ..audit import log, new_request_id
 from ..clients import build_jql, parse_search_query, rate_limit_check, search_issues
+from ..clients.project_config import resolve_project
 from ..clients.sanitizer import sanitize
 from ..schemas import SearchRequest, SearchResponse
 
@@ -20,9 +21,16 @@ async def search_issues_endpoint(
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
 
+    project_key = None
+    if body.project:
+        try:
+            project_key = resolve_project(body.project)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     try:
         struct = parse_search_query(body.query)
-        jql, max_results = build_jql(struct)
+        jql, max_results = build_jql(struct, project_key)
     except Exception as e:
         log(request_id=rid, user=x_user, action="search_issues", input_text=body.query,
             status="error", error=f"claude: {e}")

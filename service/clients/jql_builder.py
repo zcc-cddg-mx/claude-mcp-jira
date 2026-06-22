@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from ..schemas import SearchQueryStruct
 
@@ -15,9 +16,12 @@ def _jql_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def build_jql(struct: SearchQueryStruct) -> tuple[str, int]:
+def build_jql(struct: SearchQueryStruct, project_key: Optional[str] = None) -> tuple[str, int]:
     """Returns (jql_string, max_results). MAX_RESULTS is always capped at 50."""
     clauses = []
+
+    if project_key:
+        clauses.append(f'project = "{_jql_escape(project_key)}"')
 
     if struct.assignee:
         # currentUser() is a JQL function — pass through; otherwise quote

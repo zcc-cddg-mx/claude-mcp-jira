@@ -1,11 +1,13 @@
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
 from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LinkIssuePayload, LogWorkPayload, SAZIssuePayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
+from .project_config import get_config
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -21,8 +23,11 @@ def _load_prompt(name: str) -> str:
     return (_PROMPTS_DIR / f"{name}.txt").read_text()
 
 
-def _lang_suffix() -> str:
-    lang = os.environ.get("TICKET_LANG", "es").lower()
+def _lang_suffix(project_key: Optional[str] = None) -> str:
+    if project_key:
+        lang = get_config(project_key).get("ticket_lang", "es")
+    else:
+        lang = os.environ.get("TICKET_LANG", "es").lower()
     return "\n" + _LANG_INSTRUCTION.get(lang, _LANG_INSTRUCTION["es"])
 
 
@@ -51,9 +56,9 @@ def _parse_json(raw: str, label: str) -> dict:
         raise ValueError(f"{label}: invalid JSON from model ({exc.msg} at pos {exc.pos})") from exc
 
 
-def parse_create_issue(user_input: str) -> JiraIssuePayload:
+def parse_create_issue(user_input: str, project_key: Optional[str] = None) -> JiraIssuePayload:
     safe_input = sanitize(user_input)
-    prompt = _load_prompt("create_issue").format(user_input=safe_input) + _lang_suffix()
+    prompt = _load_prompt("create_issue").format(user_input=safe_input) + _lang_suffix(project_key)
     raw = _strip_fences(_call(prompt))
     return JiraIssuePayload(**_parse_json(raw, "create_issue"))
 

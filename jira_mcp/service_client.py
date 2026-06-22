@@ -20,9 +20,12 @@ def _require(d: dict, *keys: str, endpoint: str) -> None:
         raise ValueError(f"{endpoint}: missing fields {missing} in response")
 
 
-def create_issue(text: str, user: str) -> dict:
+def create_issue(text: str, user: str, project: str = None) -> dict:
+    body = {"text": text}
+    if project:
+        body["project"] = project
     with _client(user) as c:
-        r = c.post("/issues", json={"text": text})
+        r = c.post("/issues", json=body)
         r.raise_for_status()
         d = r.json()
         _require(d, "key", endpoint="POST /issues")
@@ -96,9 +99,12 @@ def create_saz(text: str, znrx_key, user: str) -> dict:
         return result
 
 
-def search_issues(query: str, user: str) -> dict:
+def search_issues(query: str, user: str, project: str = None) -> dict:
+    body = {"query": query}
+    if project:
+        body["project"] = project
     with _client(user) as c:
-        r = c.post("/issues/search", json={"query": query})
+        r = c.post("/issues/search", json=body)
         r.raise_for_status()
         d = r.json()
         _require(d, "total", "issues", endpoint="POST /issues/search")

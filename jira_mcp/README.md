@@ -7,10 +7,15 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 
 | Herramienta | Rol mínimo | Descripción |
 |---|---|---|
-| `create_jira_issue` | dev | Crea un ticket desde texto libre |
+| `create_jira_issue` | dev | Crea un ticket desde texto libre; `project` opcional |
 | `update_jira_issue` | lead | Actualiza un ticket desde texto libre |
 | `get_jira_issue` | dev | Obtiene resumen de un ticket |
-| `search_jira_issues` | dev | Búsqueda en lenguaje natural (máx. 50 resultados) |
+| `search_jira_issues` | dev | Búsqueda en lenguaje natural (máx. 50); `project` opcional |
+| `add_comment_jira_issue` | dev | Añade comentario a un ticket |
+| `link_jira_issues` | dev | Relaciona dos tickets (depends on, blocks, relates, etc.) |
+| `assign_jira_issue` | lead | Asigna un ticket a un usuario |
+| `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
+| `create_saz_request` | lead | Crea ticket SAZ (DevOps/Release); `znrx_key` opcional |
 
 ## Seguridad
 
@@ -27,7 +32,7 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 docker compose up
 ```
 
-El MCP server queda disponible en `http://localhost:8001/sse`.
+El MCP server queda disponible en `http://localhost:18001/sse` (dev) o `http://localhost:8001/sse` (Docker interno).
 
 ## Configurar en Claude Code
 
@@ -84,8 +89,8 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 
 | Rol | Herramientas permitidas |
 |---|---|
-| `dev` | `create`, `get`, `search` |
-| `lead` | `create`, `update`, `get`, `search` |
+| `dev` | `create`, `get`, `search`, `add_comment`, `link` |
+| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request` |
 | `system` | todas |
 
 Ejemplo de configuración con múltiples claves:

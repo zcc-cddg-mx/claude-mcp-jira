@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5 y 7 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 8 (UI, opcional).
+Estado general: Fases 1–5 y 7 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: Fase 8 (UI, opcional).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -92,4 +92,17 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] Seed ZNRX/AIPROJECTS/SCRX en startup (constraints conocidos)
   - [x] Proyectos desconocidos: verify en Jira + intenta `createmeta` + persiste en DB
   - [x] `GET /projects` + `GET /projects/{key}` — consulta + discovery explícito
-  - [x] `PROJECT_DB_PATH` configurable (default `projects.db`)
+  - [x] `PROJECT_DB_PATH` configurable (default resuelve relativo al módulo)
+- [x] Deuda técnica H1–H9 — remediación completa (2026-06-22):
+  - [x] H1: `scripts/test-actions.sh` — 24/24 e2e (comments, assign, priority, labels, worklog, transition, clone, link, saz)
+  - [x] H2: auto-link check en `link.py` (422 si source == target)
+  - [x] H3: rate limit en endpoints GET públicos (`/issue-link-types`, `/projects`, `/projects/{key}`)
+  - [x] H4: mitigado por H3 — sin cambios de código
+  - [x] H5: `znrx_key` con pattern regex en `CreateSAZRequest`
+  - [x] H6: `LabelsRequest`/`LabelsResponse` schemas dedicados
+  - [x] H7: `assignee min_length=1` en `AssignIssuePayload`
+  - [x] H8: `time_spent_seconds ge=60` en `LogWorkPayload`
+  - [x] H9: `PROJECT_DB_PATH` relativo al módulo en `project_db.py`
+- [x] Lagunas multi-proyecto cerradas (2026-06-22):
+  - [x] L1: `clone_issue()` usa config dinámica por proyecto (`get_config(_project_from_key(source_key))`)
+  - [x] L2, L3: no requieren fix (documentado en `arch/fix/fix-multi-project-gaps.md`)

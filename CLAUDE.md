@@ -47,6 +47,8 @@ bash scripts/dev.sh status     # ver estado
 # Tests
 bash scripts/test-dev.sh       # e2e service layer: 8 tests (CLI → FastAPI → Jira)
 bash scripts/test-mcp.sh       # e2e MCP server: 10 tests (tools + auth + RBAC)
+bash scripts/test-multi.sh     # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
+bash scripts/test-actions.sh   # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
 pytest tests/                  # tests unitarios: 52 tests (sanitizer, jql, auth, rbac)
 
 # CLI commands
@@ -172,6 +174,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
+| Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
 | 8 — UI | Futura | Interfaz web para usuarios no técnicos — evaluar antes de implementar |
 
 ## Test tickets (limpieza)

@@ -35,6 +35,8 @@ bash scripts/dev.sh restart    # reinicio limpio
 # Tests
 bash scripts/test-dev.sh       # service layer: 8 tests (CLI → FastAPI → Jira)
 bash scripts/test-mcp.sh       # MCP server: 10 tests (SSE tools + auth + RBAC)
+bash scripts/test-multi.sh     # multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
+bash scripts/test-actions.sh   # endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
 pytest tests/                  # unitarios: 52 tests (sanitizer, jql, auth, rbac)
 
 # Comandos CLI
@@ -81,8 +83,10 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
 | 4.4 — Mejoras API | ✅ Completa | comments, assign, priority, labels, clone |
 | 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types` (cache TTL 1h) |
-| 5 — Soporte SAZ | Futura | Tickets Solicitudes Release Zurich vinculados a ZNRX |
-| 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
+| 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
+| 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy; `GET /projects` |
+| 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
+| 8 — UI | Futura | Interfaz web para usuarios no técnicos — evaluar antes de implementar |
 
 ## Documentación
 

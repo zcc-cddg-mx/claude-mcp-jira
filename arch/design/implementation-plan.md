@@ -301,6 +301,18 @@ Compartir el MCP server con otros equipos implica que usuarios distintos acceder
 
 ---
 
+## Pendiente de decisión — Allowlist self-service
+
+**Contexto**: validado con el proyecto ARQX (2026-06-22) — `GET /projects/ARQX` dispara auto-discovery correctamente y persiste la config en DB, pero `POST /issues {project: "ARQX"}` devuelve 400 porque `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` lo bloquea antes de llegar a Jira.
+
+**Propuesta**: vaciar `JIRA_ALLOWED_PROJECTS` en `.env`. El control de acceso real lo ejerce el PAT de Jira — si el usuario no tiene permisos en un proyecto, Jira devuelve 403/404. La allowlist es una capa redundante que añade fricción cuando el servidor se comparte con múltiples equipos.
+
+**Cambio necesario**: solo `.env` + reinicio del service layer. Sin cambios de código.
+
+**Pendiente de decisión** con el equipo antes de aplicar en producción.
+
+---
+
 ## Fase 8 — Interfaz UI (futura)
 
 > Ver evaluación completa en `arch/evaluations/eval-ui-copilot.md` antes de implementar.

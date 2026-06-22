@@ -15,6 +15,12 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Implementación
 
+- [ ] **Vaciar `JIRA_ALLOWED_PROJECTS`** — allowlist self-service *(decisión pendiente)*
+  - Actualmente `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` bloquea proyectos no listados aunque existan en Jira y estén en la DB (validado con ARQX — auto-discovery OK pero create → 400)
+  - Propuesta: dejar `JIRA_ALLOWED_PROJECTS=` vacío; el control de acceso real lo da el PAT de Jira (solo puede crear donde tiene permisos)
+  - Impacto: cambio solo en `.env` + reinicio; no requiere código
+  - Pendiente de decisión con el equipo antes de aplicar en producción
+
 - [ ] **Fase 8 — UI** *(futura — evaluar antes de implementar)*
   - Ver `arch/evaluations/eval-ui-copilot.md`
   - Objetivo: interfaz web para usuarios no técnicos sobre los mismos endpoints

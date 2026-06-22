@@ -93,6 +93,8 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `GET` | `/issue-link-types` | Lista tipos de link reales de Jira (cache TTL 1h) |
 | `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, etc.) — 501 |
 | `POST` | `/issues/saz` | Crear ticket SAZ (DevOps/Release); `znrx_key` opcional para vincularlo |
+| `GET` | `/projects` | Lista proyectos registrados en DB (seed + auto-descubiertos) |
+| `GET` | `/projects/{key}` | Config de un proyecto; dispara auto-discovery desde Jira si no existe en DB |
 | `GET` | `/health` | Health check |
 
 ## MCP server — tools
@@ -169,7 +171,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h |
 | 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
-| 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; `project_config.py`; validación `JIRA_ALLOWED_PROJECTS` |
+| 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
 | 8 — UI | Futura | Interfaz web para usuarios no técnicos — evaluar antes de implementar |
 
 ## Test tickets (limpieza)

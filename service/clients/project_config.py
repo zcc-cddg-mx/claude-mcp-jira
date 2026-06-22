@@ -1,60 +1,39 @@
+"""
+Thin facade over project_db — keeps the same public API so callers don't change.
+
+  get_config(key)       → dict with project constraints (from DB or auto-discovered)
+  resolve_project(key)  → validated project key (raises ValueError if Jira 404)
+"""
+
 import os
 from typing import Optional
 
-# Allowed projects — validated at request time; Claude/user input never bypasses this.
-# Format: comma-separated list, e.g. "ZNRX,AIPROJECTS,SCRX"
-_ALLOWED_RAW = os.environ.get("JIRA_ALLOWED_PROJECTS", os.environ.get("JIRA_PROJECT_KEY", ""))
-ALLOWED_PROJECTS: list[str] = [p.strip() for p in _ALLOWED_RAW.split(",") if p.strip()]
+from .project_db import get_or_discover
 
-_DEFAULT_PROJECT = os.environ.get("JIRA_DEFAULT_PROJECT", ALLOWED_PROJECTS[0] if ALLOWED_PROJECTS else "")
+_DEFAULT_PROJECT = os.environ.get("JIRA_DEFAULT_PROJECT", os.environ.get("JIRA_PROJECT_KEY", ""))
 
-# Per-project field constraints derived from docs/jira-fields.md.
-# priority_format: "id" → must use numeric ID; "name" → plain name accepted.
-# required_custom: extra fields injected on creation.
-# issuetype_fallback: map unsupported types to a safe alternative.
-# ticket_lang: default language for Claude-generated content.
-_PROJECT_CONFIGS: dict[str, dict] = {
-    "ZNRX": {
-        "priority_format": "id",
-        "priority_ids": {"Highest": "1", "High": "2", "Low": "4"},
-        "required_custom": {"customfield_25832": {"id": "44461"}},
-        "issuetype_fallback": {"Bug": "Task", "Improvement": "Task"},
-        "ticket_lang": "es",
-    },
-    "AIPROJECTS": {
-        "priority_format": "name",
-        "priority_ids": {},
-        "required_custom": {},
-        "issuetype_fallback": {},
-        "ticket_lang": "en",
-    },
-    "SCRX": {
-        "priority_format": "name",
-        "priority_ids": {},
-        "required_custom": {},
-        "issuetype_fallback": {},
-        "ticket_lang": "es",
-    },
-}
-
-# Fallback config used for any project not explicitly listed above.
-_DEFAULT_CONFIG: dict = {
-    "priority_format": "name",
-    "priority_ids": {},
-    "required_custom": {},
-    "issuetype_fallback": {},
-    "ticket_lang": os.environ.get("TICKET_LANG", "es"),
-}
+# JIRA_ALLOWED_PROJECTS is now advisory — it gates which projects users can send
+# via the API. If empty, any project that exists in Jira is allowed.
+_ALLOWED_RAW = os.environ.get("JIRA_ALLOWED_PROJECTS", "")
+ALLOWED_PROJECTS: list[str] = [p.strip().upper() for p in _ALLOWED_RAW.split(",") if p.strip()]
 
 
 def get_config(project_key: str) -> dict:
-    return _PROJECT_CONFIGS.get(project_key.upper(), _DEFAULT_CONFIG)
+    """Return config for project_key, auto-discovering from Jira if needed."""
+    return get_or_discover(project_key.upper())
 
 
 def resolve_project(requested: Optional[str]) -> str:
-    """Return the effective project key, validating against JIRA_ALLOWED_PROJECTS."""
+    """
+    Resolve and validate the effective project key.
+    - If JIRA_ALLOWED_PROJECTS is set, project must be in the list.
+    - Always verifies the project exists in Jira (via get_or_discover).
+    Raises ValueError on invalid or nonexistent project.
+    """
     key = (requested or _DEFAULT_PROJECT).upper()
     if ALLOWED_PROJECTS and key not in ALLOWED_PROJECTS:
         allowed = ", ".join(ALLOWED_PROJECTS)
         raise ValueError(f"Project '{key}' not in allowed list: {allowed}")
+    # This call verifies existence in Jira and populates the DB if needed
+    get_or_discover(key)
     return key

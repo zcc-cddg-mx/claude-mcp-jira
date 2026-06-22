@@ -73,7 +73,7 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] MCP tool `link_jira_issues` (dev)
 - [x] Limpieza Jira — 6 tickets `[MCP Claude Jira Test]` eliminados el 2026-06-20
   - ZNRX-68147, 68154, 68163 (top-level + subtasks), 68161, 68162, 68170 (subtasks directos)
-- [x] Fase 7 — Multi-proyecto:
+- [x] Fase 7 — Multi-proyecto + SQLite auto-discovery:
   - [x] `service/clients/project_config.py` — configs ZNRX/AIPROJECTS/SCRX + `resolve_project()` + `get_config()`
   - [x] `project` opcional en `POST /issues` y `POST /issues/search`
   - [x] `create_issue()` y `update_issue()` y `set_priority()` usan config del proyecto
@@ -82,3 +82,8 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] MCP tools `create_jira_issue` y `search_jira_issues` aceptan `project` opcional
   - [x] CLI `create` y `list-issues` aceptan `--project` flag
   - [x] `TICKET_LANG` per-proyecto según `project_config.py`
+  - [x] `service/clients/project_db.py` — SQLite + auto-discovery lazy desde Jira
+  - [x] Seed ZNRX/AIPROJECTS/SCRX en startup (constraints conocidos)
+  - [x] Proyectos desconocidos: verify en Jira + intenta `createmeta` + persiste en DB
+  - [x] `GET /projects` + `GET /projects/{key}` — consulta + discovery explícito
+  - [x] `PROJECT_DB_PATH` configurable (default `projects.db`)

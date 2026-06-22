@@ -33,6 +33,7 @@ from .jira_client import (
 )
 from .jql_builder import build_jql
 from .project_config import get_config, resolve_project
+from .project_db import init_db, list_projects, seed
 from .rate_limiter import check as rate_limit_check
 from .sanitizer import sanitize
 
@@ -68,7 +69,10 @@ __all__ = [
     "update_labels",
     "build_jql",
     "get_config",
+    "init_db",
+    "list_projects",
     "resolve_project",
+    "seed",
     "rate_limit_check",
     "sanitize",
 ]

@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5 y 7 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: Fase 8 (UI, opcional).
+Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: Fase 8a (PAT dinámico) o mejora human-sensity en worklogs.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -34,12 +34,12 @@ Actualizar este archivo al completar o añadir tareas.
   - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
 
-- [ ] **Fase 9 — Git Intelligence** *(futura — alta prioridad relativa)*
-  - Ver `arch/evaluations/eval-git-copilot.md` y plan en `arch/design/implementation-plan.md`
-  - Objetivo: leer repos Git locales, mapear commits→tickets, registrar worklogs con preview
-  - MCP tool `sync_git_worklogs(repo_path, since_days)` — funciona sin UI
-  - Sub-fases: 9.1 scanner+mapper, 9.2 estimación+registro, 9.3 MCP tool, 9.4 UI (opcional)
-  - No enviar código a Claude — solo mensajes de commit, nombres de archivo, LOC count
+- [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
+  - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
+  - Objetivo: que los worklogs auto-registrados se sientan naturales, no mecánicos
+  - Señales adicionales: tipo de archivo cambiado, hora del día, densidad de commits, patrón de mensajes
+  - Human-in-the-loop: preview editable antes de registrar (`dry_run=true` + ajuste manual)
+  - Integración con `default_issue_key` del repo registry para fallbacks con sentido
 
 ---
 
@@ -119,6 +119,14 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] H7: `assignee min_length=1` en `AssignIssuePayload`
   - [x] H8: `time_spent_seconds ge=60` en `LogWorkPayload`
   - [x] H9: `PROJECT_DB_PATH` relativo al módulo en `project_db.py`
+- [x] Fase 9 — Git Intelligence completa (2026-06-22):
+  - [x] 9.1 Scanner (`service/git/scanner.py`) — subprocess git log, solo metadata
+  - [x] 9.2 Analyzer + mapper (`service/git/analyzer.py`, `service/git/mapper.py`) — sesiones, estimación de tiempo, extracción de issue key
+  - [x] 9.3 `POST /git/sync` + MCP tool `sync_git_worklogs` (dev+) — dry_run/real, Claude NLP fallback
+  - [x] 9.4 Repo registry (`service/git/repo_registry.py`) — SQLite `git_repos`, CRUD, fallback por default_issue_key
+  - [x] MCP tools `register_git_repo` + `list_git_repos` (dev+)
+  - [x] `POST/GET/DELETE /git/repos` endpoints REST
+- [x] Documentación BD (`arch/bd/README.md`) — tablas `projects` y `git_repos`, columnas, repos actuales, endpoints (2026-06-22)
 - [x] Lagunas multi-proyecto cerradas (2026-06-22):
   - [x] L1: `clone_issue()` usa config dinámica por proyecto (`get_config(_project_from_key(source_key))`)
   - [x] L2, L3: no requieren fix (documentado en `arch/fix/fix-multi-project-gaps.md`)

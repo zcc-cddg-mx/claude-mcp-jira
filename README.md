@@ -88,7 +88,8 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
 | 8a — PAT dinámico | Futura | `X-Jira-Token` header opcional — cada usuario opera con su propia identidad Jira |
 | 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
-| 9 — Git Intelligence | Futura | Mapear commits→tickets, estimar y registrar worklogs automáticamente; MCP tool `sync_git_worklogs` |
+| 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner, analyzer, mapper, `POST /git/sync`, repo registry SQLite, MCP `sync_git_worklogs` / `register_git_repo` |
+| 9.5 — Human-sensity worklogs | Futura | Señales contextuales + human-in-the-loop editable antes de registrar |
 
 ## Documentación
 
@@ -99,5 +100,6 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | [`docs/jira-roles.md`](docs/jira-roles.md) | Permisos efectivos del usuario en los 4 proyectos |
 | [`docs/jira-link-types.md`](docs/jira-link-types.md) | Tipos de link — 29 tipos en jira.zurich.com; también disponible vía `GET /issue-link-types` |
 | [`docs/jira-workflows.md`](docs/jira-workflows.md) | Statuses y transiciones por proyecto |
+| [`arch/bd/README.md`](arch/bd/README.md) | Base de datos SQLite — tablas `projects` y `git_repos`, columnas, repos registrados |
 | [`arch/`](arch/README.md) | Arquitectura, plan de implementación, evaluaciones e informes técnicos |
 | [`jira_mcp/README.md`](jira_mcp/README.md) | Variables de entorno y configuración del MCP server |

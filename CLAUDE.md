@@ -157,6 +157,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Tipos de link Jira | `docs/jira-link-types.md` |
 | Workflows por proyecto | `docs/jira-workflows.md` |
 | Evaluaciones externas | `arch/evaluations/` |
+| Base de datos SQLite | `arch/bd/README.md` |
 
 ## Implementation phases
 
@@ -177,7 +178,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
 | 8a — PAT dinámico | Futura | `X-Jira-Token` header opcional — cada usuario opera con su propia identidad Jira; sin infraestructura adicional |
 | 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
-| 9 — Git Intelligence | Futura | Leer repos locales, mapear commits→tickets, registrar worklogs automáticamente con preview — `sync_git_worklogs` MCP tool |
+| 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, `POST /git/sync`, repo registry SQLite (`git_repos`), MCP `sync_git_worklogs`/`register_git_repo`/`list_git_repos` |
+| 9.5 — Human-sensity worklogs | Futura | Señales contextuales (tipo archivo, hora del día, densidad commits) + preview editable human-in-the-loop antes de registrar |
 
 ## Test tickets (limpieza)
 

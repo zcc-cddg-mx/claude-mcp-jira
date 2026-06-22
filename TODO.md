@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 6 (Observabilidad, opcional) o Fase 7 (Multi-proyecto).
+Estado general: Fases 1–5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 7 (Multi-proyecto) o Fase 8 (UI).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -15,12 +15,6 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Implementación
 
-- [ ] **Fase 6 — Observabilidad** *(opcional — activar cuando el volumen lo justifique)*
-  - Métricas Prometheus en `/metrics`
-  - Trazas OpenTelemetry con `trace_id` propagado
-  - Caching 30-60s en `search_jira_issues`
-  - Dashboard Grafana básico
-
 - [ ] **Fase 7 — Multi-proyecto** *(futura — evaluar antes de implementar)*
   - Ver `arch/evaluations/eval-multiproject-copilot.md`
   - Objetivo: routing dinámico de proyecto; configuración por proyecto
@@ -28,6 +22,16 @@ Actualizar este archivo al completar o añadir tareas.
 - [ ] **Fase 8 — UI** *(futura — evaluar antes de implementar)*
   - Ver `arch/evaluations/eval-ui-copilot.md`
   - Objetivo: interfaz web para usuarios no técnicos sobre los mismos endpoints
+
+---
+
+## Futuros cambios (sin fecha — activar cuando el volumen lo justifique)
+
+- **Fase 6 — Observabilidad**
+  - Métricas Prometheus en `/metrics`
+  - Trazas OpenTelemetry con `trace_id` propagado
+  - Caching 30-60s en `search_jira_issues`
+  - Dashboard Grafana básico
 
 ---
 

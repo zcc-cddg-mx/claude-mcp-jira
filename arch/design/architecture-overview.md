@@ -2,7 +2,7 @@
 
 **Proyecto**: claude-mcp-jira  
 **Entorno**: red corporativa Zurich — Jira Server/Data Center (`jira.zurich.com`)  
-**Fecha**: Junio 2026 — estado post-Fase 4
+**Fecha**: Junio 2026 — estado post-Fase 7b
 
 ---
 
@@ -12,9 +12,9 @@ Sistema de tres capas que permite gestionar tickets Jira en lenguaje natural des
 
 ```
 [CLI (Typer)]     ──HTTP──►
-                            [Service Layer (FastAPI :8000)] ──► [LiteLLM proxy → Claude API]
-[MCP Server SSE]  ──HTTP──►                                 ──► [Jira REST API v2]
-     :8001                                                        jira.zurich.com
+                            [Service Layer (FastAPI :18000)] ──► [LiteLLM proxy → Claude API]
+[MCP Server SSE]  ──HTTP──►                                  ──► [Jira REST API v2]
+     :18001                                                        jira.zurich.com
        ▲
 [Claude Code]
 ```
@@ -30,7 +30,7 @@ Sistema de tres capas que permite gestionar tickets Jira en lenguaje natural des
 | Componente | Tecnología | Puerto | Invocado por |
 |---|---|---|---|
 | CLI | Python / Typer | — | Desarrollador en terminal |
-| MCP Server | Python / SDK `mcp` + Starlette SSE | 8001 | Claude Code (LLM) |
+| MCP Server | Python / SDK `mcp` + Starlette SSE | 18001 | Claude Code (LLM) |
 
 La CLI y el MCP server son **clientes HTTP del service layer**. No duplican lógica.
 
@@ -47,20 +47,49 @@ Núcleo del sistema. Expone una API REST interna y es el único componente que h
 
 | Endpoint | Método | Descripción |
 |---|---|---|
-| `/issues` | POST | Crear ticket desde texto libre |
+| `/issues` | POST | Crear ticket desde texto libre; `project` opcional |
 | `/issues/{key}` | PATCH | Actualizar ticket desde texto libre |
 | `/issues/{key}/summary` | GET | Resumen Claude del ticket |
-| `/issues/search` | POST | Búsqueda NL → JQL controlado (máx. 50) |
+| `/issues/search` | POST | Búsqueda NL → JQL controlado (máx. 50); `project` opcional |
+| `/issues/{key}/transition` | POST | Cambiar estado (texto libre → Claude → transición Jira) |
+| `/issues/{key}/worklog` | POST | Registrar horas (texto libre → Claude → worklog Jira) |
+| `/issues/{key}/comments` | POST | Añadir comentario |
+| `/issues/{key}/assign` | POST | Asignar ticket (texto libre → Claude → assignee) |
+| `/issues/{key}/priority` | POST | Cambiar prioridad (texto libre → Claude → priority) |
+| `/issues/{key}/labels` | POST | Gestionar labels (SET/ADD/REMOVE) |
+| `/issues/{key}/clone` | POST | Clonar ticket con overrides opcionales |
+| `/issues/{key}/link` | POST | Relacionar tickets (texto libre → Claude → issueLink) |
+| `/issue-link-types` | GET | Tipos de link reales de Jira (cache TTL 1h) |
+| `/issues/saz` | POST | Crear ticket SAZ; `znrx_key` opcional para vincularlo |
+| `/projects` | GET | Lista proyectos registrados en DB |
+| `/projects/{key}` | GET | Config de un proyecto; dispara auto-discovery si no existe |
 | `/health` | GET | Health check |
 
 Responsabilidades exclusivas del service layer:
 - **Sanitización**: elimina tokens, IPs RFC1918, hostnames internos (`*.zurich.com`, `*.internal`), stack traces antes de enviar a Claude
-- **Audit log**: JSON-lines con `request_id` UUID por operación (`AUDIT_LOG_PATH`)
+- **Audit log**: JSON-lines con `request_id` UUID por operación; rotación 10 MB × 5 backups
 - **JQL controlado**: Claude genera un struct → el service layer construye el JQL seguro (nunca JQL libre)
 - **Rate limiting por usuario**: sliding window (30 calls/60s)
 - **Timeouts**: `JIRA_TIMEOUT` para Jira, `MCP_SERVICE_TIMEOUT` para el MCP server
+- **Registro de proyectos**: SQLite con auto-discovery lazy desde Jira
 
-### 2.3 Clientes externos
+### 2.3 Registro de proyectos (SQLite)
+
+`service/clients/project_db.py` — backend persistente con discovery automático:
+
+```
+POST /issues {"project": "NEWTEAM", "text": "..."}
+    │
+    ├─► resolve_project("NEWTEAM") → DB lookup → miss
+    ├─► GET /rest/api/2/project/NEWTEAM (verifica existencia en Jira; 400 si 404)
+    ├─► GET /rest/api/2/issue/createmeta?projectKeys=NEWTEAM (extrae campos requeridos si disponible)
+    └─► INSERT INTO projects (source: "jira_auto") → procede con la creación
+```
+
+Proyectos seeded al startup con configs curadas (source: `seed`): ZNRX, AIPROJECTS, SCRX.  
+Cualquier otro proyecto Jira válido se registra en el primer acceso, sin intervención admin.
+
+### 2.4 Clientes externos
 
 | Cliente | Destino | Auth | Cert |
 |---|---|---|---|
@@ -74,12 +103,13 @@ Responsabilidades exclusivas del service layer:
 ### 3.1 Crear ticket desde CLI
 
 ```
-cli/main.py create "bug login en producción prioridad alta"
+cli/main.py create "bug login en producción prioridad alta" --project ZNRX
     │
-    ▼ POST /issues {"text": "...", "user": "carlos.duarte2"}
+    ▼ POST /issues {"text": "...", "project": "ZNRX", "user": "carlos.duarte2"}
 service/routes/issues.py
     │
-    ├─► sanitizer.py  →  texto limpio (sin IPs, tokens, hosts internos)
+    ├─► resolve_project("ZNRX") → config del proyecto (priority_format, required_custom, etc.)
+    ├─► sanitizer.py  →  texto limpio
     ├─► claude_client.parse_create_issue()  →  {summary, description, priority, issuetype}
     ├─► jira_client.create_issue()  →  POST /rest/api/2/issue  →  {"key": "ZNRX-1234"}
     └─► audit.log()  →  {"request_id": "uuid", "jira_key": "ZNRX-1234", "status": "ok"}
@@ -92,11 +122,11 @@ service/routes/issues.py
 ```
 Claude Code: "crea un ticket para el bug de autenticación"
     │
-    ▼ MCP call: create_jira_issue(text="bug de autenticación")
-mcp/server.py
+    ▼ MCP call: create_jira_issue(text="bug de autenticación", project="ZNRX")
+jira_mcp/server.py
     ├─► verify_api_key + verify_ip + check_permission + rate_check
     ├─► pre-validación (vacío / tamaño)
-    └─► mcp/service_client.py  →  POST http://service:8000/issues
+    └─► jira_mcp/service_client.py  →  POST http://service:18000/issues
                                          (mismo flujo que 3.1)
     │
     ▼ {"key": "ZNRX-1234", "status": "created"}  ← output normalizado al LLM
@@ -105,25 +135,40 @@ mcp/server.py
 ### 3.3 Búsqueda con JQL controlado
 
 ```
-"mis bugs abiertos de esta semana"
+"mis bugs abiertos de esta semana en AIPROJECTS"
     │
     ▼ claude_client.parse_search_query()
     │   → struct: {assignee: "currentUser()", issuetype: "Bug", date_range: "last_week"}
-    ▼ jql_builder.build_jql(struct)
-    │   → "assignee = currentUser() AND issuetype = "Bug" AND created >= -7d ORDER BY created DESC"
+    ▼ jql_builder.build_jql(struct, project_key="AIPROJECTS")
+    │   → "project = "AIPROJECTS" AND assignee = currentUser() AND issuetype = "Bug" AND created >= -7d"
     ▼ jira_client.search_issues(jql, max_results=50)
 ```
 
 Claude nunca genera JQL directamente — solo el struct de parámetros controlados.
 
+### 3.4 Crear ticket SAZ vinculado a ZNRX
+
+```
+POST /issues/saz {"text": "reiniciar servicio auth en prod", "znrx_key": "ZNRX-1234"}
+    │
+    ├─► rate_limit_check
+    ├─► parse_saz_request(text) → {summary, description, issue_type: "Support"}
+    ├─► create_saz_issue(payload) → POST /rest/api/2/issue → "SAZ-7403"
+    ├─► POST /rest/api/2/issueLink (Relates: SAZ-7403 → ZNRX-1234)
+    └─► {"saz_key": "SAZ-7403", "znrx_key": "ZNRX-1234", "status": "linked"}
+```
+
 ---
 
 ## 4. Proyectos Jira
 
-| Key | Nombre | Uso | Estado |
-|---|---|---|---|
-| `ZNRX` | Proyecto de desarrollo | Tickets de features, bugs y tareas del equipo | Activo |
-| `SAZ` | Solicitudes Release Zurich | Reinicios, deploys, repos, accesos DevOps | Fase 5 — futura |
+| Key | Nombre | Uso | `TICKET_LANG` | Fuente config |
+|---|---|---|---|---|
+| `ZNRX` | Gestión requerimientos | Features, bugs, tareas del equipo | `es` | seed |
+| `AIPROJECTS` | IA y automatización | Proyectos IA internacionales | `en` | seed |
+| `SCRX` | Desarrollo LATAM | Desarrollo ágil Ecuador/LATAM | `es` | seed |
+| `SAZ` | Solicitudes Release | DevOps: reinicios, deploys, repos, accesos | `es` | jira_auto |
+| cualquier otro | — | Auto-descubierto en primer acceso | `es` (default) | jira_auto |
 
 ### Relación ZNRX ↔ SAZ
 
@@ -131,11 +176,17 @@ Un SAZ es autónomo pero habitualmente se vincula a un ZNRX como documentación 
 
 ```
 ZNRX-1234  (feature en desarrollo)
-    └── SAZ-7177  (solicitud de deploy al equipo Release)
-                   link: POST /rest/api/2/issueLink
+    └── SAZ-7403  (link: "Relates" — solicitud de deploy al equipo Release)
 ```
 
-El `znrx_key` será opcional en la Fase 5 — el link solo se crea si se provee.
+### Restricciones ZNRX
+
+| Restricción | Valor |
+|---|---|
+| `customfield_25832` (Línea de Servicio) | obligatorio — BAU id=44461 |
+| Priority | solo por ID: Highest=1, High=2, Low=4 |
+| Bug issuetype | bloqueado por workflow → fallback a Task |
+| Subtasks | screen diferente — no acepta `customfield_25832` ni `priority` |
 
 ---
 
@@ -162,11 +213,26 @@ El `znrx_key` será opcional en la Fase 5 — el link solo se crea si se provee.
 | MCP | Rate limit | `MCP_RATE_LIMIT_MAX_CALLS` / `_WINDOW` |
 | MCP | Pre-validación payload | `MCP_MAX_PAYLOAD_SIZE` |
 | Service | Sanitización (tokens, IPs, hosts, stack traces) | — |
-| Service | Audit log con `request_id` | `AUDIT_LOG_PATH` |
+| Service | Audit log con `request_id` y rotación | `AUDIT_LOG_PATH` |
 | Service | Rate limit por usuario | `RATE_LIMIT_MAX_CALLS` / `_WINDOW` |
 | Service | JQL controlado (máx. 50 resultados) | `JIRA_MAX_RESULTS` |
+| Service | Project allowlist (opcional) | `JIRA_ALLOWED_PROJECTS` |
 | Jira client | PAT Bearer + cert corporativo | `JIRA_PAT`, `REQUESTS_CA_BUNDLE` |
 | Claude client | Proxy interno LiteLLM | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+
+### RBAC — herramientas MCP por rol
+
+| Tool | dev | lead | system |
+|---|---|---|---|
+| `create_jira_issue` | ✅ | ✅ | ✅ |
+| `get_jira_issue` | ✅ | ✅ | ✅ |
+| `search_jira_issues` | ✅ | ✅ | ✅ |
+| `add_comment_jira_issue` | ✅ | ✅ | ✅ |
+| `link_jira_issues` | ✅ | ✅ | ✅ |
+| `update_jira_issue` | ❌ | ✅ | ✅ |
+| `assign_jira_issue` | ❌ | ✅ | ✅ |
+| `set_priority_jira_issue` | ❌ | ✅ | ✅ |
+| `create_saz_request` | ❌ | ✅ | ✅ |
 
 ---
 
@@ -187,22 +253,83 @@ Todos los certificados viven en `certs/` y se instalan en `/etc/ssl/certs/` dent
 
 ```yaml
 services:
-  service:   # FastAPI — puerto 8000
-  mcp:       # MCP SSE — puerto 8001
+  service:   # FastAPI — host:18000 → container:8000
+  mcp:       # MCP SSE — host:18001 → container:8001
              # depends_on: service
 volumes:
   audit_log: # /app/audit.log persistido entre reinicios
+  projects_db: # /app/projects.db — registro SQLite de proyectos
 ```
 
 ```bash
-docker compose up          # producción
-uvicorn service.main:app   # service en dev (sin Docker)
-python -m mcp.server       # MCP en dev (sin Docker)
+docker compose up                # producción
+bash scripts/dev.sh both         # dev sin Docker (service :18000 + MCP :18001)
+bash scripts/dev.sh restart      # reinicio limpio
 ```
 
 ---
 
-## 8. Decisiones de arquitectura clave
+## 8. Estructura de directorios
+
+```
+claude-mcp-jira/
+├── cli/
+│   └── main.py                    # Typer CLI — create, update, summarize, list-issues (--project)
+├── service/
+│   ├── main.py                    # FastAPI v0.4.0 — lifespan: init_db + seed
+│   ├── audit.py                   # JSON-lines con request_id, rotación 10 MB × 5
+│   ├── routes/                    # issues, update, summarize, search, transitions, worklog,
+│   │                              # comments, assign, priority, labels, clone, link, saz, projects, actions
+│   ├── schemas/issue.py           # Todos los schemas Request/Payload/Response
+│   ├── clients/
+│   │   ├── sanitizer.py           # Sanitización extendida
+│   │   ├── claude_client.py       # parse_*(). _lang_suffix() per-proyecto
+│   │   ├── jira_client.py         # PAT Bearer + cert + timeout; config dinámica por proyecto
+│   │   ├── jql_builder.py         # Claude → struct → JQL seguro; project_key opcional
+│   │   ├── project_config.py      # Fachada: get_config(), resolve_project()
+│   │   ├── project_db.py          # SQLite: init_db, seed, get_or_discover, list_projects
+│   │   └── rate_limiter.py        # Sliding window por usuario
+│   └── prompts/                   # create, update, summarize, search, transition, log_work,
+│                                  # add_comment, assign, priority, labels, clone, link, saz_create
+├── jira_mcp/
+│   ├── server.py                  # SSE server — 9 herramientas + audit log
+│   ├── auth.py                    # API key + IP allowlist
+│   ├── rbac.py                    # Roles dev/lead/system y permisos
+│   ├── service_client.py          # Cliente httpx con output filtrado
+│   └── README.md
+├── shared/
+│   └── rate_limiter.py            # RateLimiter compartido entre service y jira_mcp
+├── tests/
+│   ├── test_sanitizer.py          # 13 tests
+│   ├── test_jql_builder.py        # 18 tests (escape + injection)
+│   ├── test_auth.py               # 10 tests
+│   └── test_rbac.py               # 11 tests
+├── docs/
+│   ├── jira-projects.md           # Metadata ZNRX, AIPROJECTS, SAZ, SCRX
+│   ├── jira-fields.md             # Campos requeridos/opcionales por proyecto
+│   ├── jira-roles.md              # Permisos efectivos del usuario
+│   ├── jira-link-types.md         # 29 link types; recomendación SAZ→ZNRX
+│   └── jira-workflows.md          # Statuses y transiciones por proyecto
+├── certs/                         # Certificados raíz corporativos Zurich
+├── arch/
+│   ├── design/                    # arquitectura + plan de implementación
+│   ├── evaluations/               # evals externas por fase
+│   └── reports/                   # informe técnico MCP
+├── scripts/
+│   ├── dev.sh                     # arranque/stop/restart/status local
+│   ├── test-dev.sh                # 8 tests e2e service layer
+│   ├── test-mcp.sh                # 10 tests e2e MCP server
+│   └── test-docker.sh             # runner Docker e2e completo
+├── Dockerfile                     # Service layer
+├── docker-compose.yml             # service (:18000) + mcp (:18001)
+├── environment.yml
+├── .env.example
+└── CLAUDE.md
+```
+
+---
+
+## 9. Decisiones de arquitectura clave
 
 | Decisión | Elegida | Motivo |
 |---|---|---|
@@ -215,3 +342,8 @@ python -m mcp.server       # MCP en dev (sin Docker)
 | Output MCP | Normalizado `{key, status}` | Evitar filtración de datos internos al LLM |
 | Persistencia MCP | Ninguna — stateless | Sin disco, escalable, menor superficie de ataque |
 | Trazabilidad | `request_id` UUID por operación | Correlacionar logs sin sesiones complejas |
+| Registro proyectos | SQLite + auto-discovery lazy | Soporte multi-equipo sin admin; cualquier proyecto Jira válido funciona en el primer acceso |
+| Allowlist proyectos | Opcional (`JIRA_ALLOWED_PROJECTS`) | Si está vacía, cualquier proyecto Jira válido es aceptado |
+| Link types | Consultados en tiempo real + cache 1h | Portable entre instancias Jira; no hardcodeados |
+| Endpoints | Commands explícitos por acción | Issue Jira = aggregate; mejor auditoría y uso por Claude/MCP |
+| Swagger en producción | Deshabilitado (`APP_ENV=prod`) | Evitar exposición de contratos internos |

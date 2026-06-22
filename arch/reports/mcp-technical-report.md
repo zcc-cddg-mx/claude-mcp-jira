@@ -2,7 +2,7 @@
 
 **Proyecto**: claude-mcp-jira  
 **Propósito**: referencia técnica para evaluaciones, auditorías y decisiones de arquitectura futuras  
-**Fecha**: Junio 2026 — actualizado post-Fase 4
+**Fecha**: Junio 2026 — actualizado post-Fase 7b
 
 ---
 
@@ -41,7 +41,7 @@ Puede estar implementado en cualquier lenguaje. En este proyecto: **Python con e
 
 | Primitiva | Descripción | Ejemplo en este proyecto |
 |---|---|---|
-| **Tools** | Funciones que el LLM puede invocar | `create_jira_issue`, `search_jira_issues` |
+| **Tools** | Funciones que el LLM puede invocar | `create_jira_issue`, `search_jira_issues`, `create_saz_request` |
 | **Resources** | Datos que el LLM puede leer | Contenido de un ticket Jira |
 | **Prompts** | Templates de prompt reutilizables | Prompt de resumen de ticket |
 
@@ -62,7 +62,7 @@ MCP soporta dos mecanismos de transporte:
   "mcpServers": {
     "jira": {
       "command": "python",
-      "args": ["mcp/server.py"]
+      "args": ["jira_mcp/server.py"]
     }
   }
 }
@@ -72,14 +72,14 @@ MCP soporta dos mecanismos de transporte:
 - El MCP server corre como servicio HTTP independiente
 - Claude se conecta vía HTTP/SSE a una URL
 - Ideal para: entornos corporativos, servidores compartidos, Docker
-- **Recomendado para este proyecto** — el servidor vive en la red interna Zurich
+- **Implementado en este proyecto** — el servidor vive en la red interna Zurich
 
 ```json
 {
   "mcpServers": {
     "jira": {
       "type": "sse",
-      "url": "http://mcp-jira.internal/sse",
+      "url": "http://localhost:18001/sse",
       "headers": { "X-API-Key": "<clave-interna>" }
     }
   }
@@ -95,7 +95,7 @@ MCP soporta dos mecanismos de transporte:
    "Crea un ticket para el bug de autenticación"
 
 2. Claude (LLM) decide invocar la herramienta:
-   create_jira_issue(text="bug de autenticación")
+   create_jira_issue(text="bug de autenticación", project="ZNRX")
 
 3. Claude Code (host MCP) envía la llamada al MCP server vía SSE
 
@@ -103,9 +103,9 @@ MCP soporta dos mecanismos de transporte:
    - Verifica API key, IP, RBAC y rate limit
    - Pre-valida el input (vacío / tamaño > MCP_MAX_PAYLOAD_SIZE)
    - Delega al service layer FastAPI:
-     POST http://service:8000/issues  {"text": "bug de autenticación", "user": "..."}
+     POST http://service:18000/issues  {"text": "bug de autenticación", "project": "ZNRX", "user": "..."}
 
-5. Service layer: sanitiza → Claude API (LiteLLM proxy) → Jira REST API v2
+5. Service layer: resolve_project → sanitiza → Claude API (LiteLLM proxy) → Jira REST API v2
 
 6. MCP server devuelve resultado normalizado a Claude Code:
    {"key": "ZNRX-1234", "status": "created"}
@@ -141,7 +141,8 @@ async def list_tools():
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "text": {"type": "string", "description": "Descripción del ticket"}
+                    "text": {"type": "string", "description": "Descripción del ticket"},
+                    "project": {"type": "string", "description": "Proyecto Jira (opcional)"}
                 },
                 "required": ["text"]
             }
@@ -152,7 +153,7 @@ async def list_tools():
 async def call_tool(name: str, arguments: dict):
     if name == "create_jira_issue":
         # Delegar al service layer — nunca duplicar lógica aquí
-        result = await service_client.create_issue(arguments["text"])
+        result = await service_client.create_issue(arguments["text"], arguments.get("project"))
         return [TextContent(type="text", text=f"Ticket creado: {result['key']}")]
 ```
 
@@ -178,15 +179,15 @@ Problemas:
 ```
 [Dev machine]                [Red interna Zurich]
     │                                │
-    │  Claude Code ──SSE──►  [MCP Server Docker :8001]
+    │  Claude Code ──SSE──►  [MCP Server Docker :18001]
     │                                │
-    │                         [Service Layer FastAPI :8000]
+    │                         [Service Layer FastAPI :18000]
     │                                │
-    │                         [jira.zurich.com]  (ZNRX, SAZ)
+    │                         [jira.zurich.com]  (ZNRX, SAZ, AIPROJECTS, SCRX, ...)
     │                         [LiteLLM proxy → Claude API]
 ```
 
-### 6.3 Controles de seguridad implementados (Fase 4)
+### 6.3 Controles de seguridad implementados
 
 | Control | Implementación | Variable |
 |---|---|---|
@@ -197,21 +198,20 @@ Problemas:
 | Rate limiting MCP | Sliding window por API key | `MCP_RATE_LIMIT_MAX_CALLS` |
 | Rate limiting service | Sliding window por usuario | `RATE_LIMIT_MAX_CALLS` |
 | Sanitización | Tokens, IPs RFC1918, hostnames internos, stack traces | — |
-| Audit log | Trazabilidad completa con `request_id` UUID | `AUDIT_LOG_PATH` |
+| Audit log | Trazabilidad completa con `request_id` UUID + rotación 10 MB × 5 | `AUDIT_LOG_PATH` |
 | Output normalizado | LLM solo recibe `{key, status}` o `{key, summary}` | — |
 | Timeout | Todos los clientes externos con timeout configurable | `JIRA_TIMEOUT`, `MCP_SERVICE_TIMEOUT` |
+| SSE timeout | `asyncio.wait_for` en `handle_sse` | `MCP_SSE_TIMEOUT` |
 
 ---
 
 ## 7. Diferencia entre MCP server y el service layer FastAPI
 
-Un error común es confundir ambos componentes. En este proyecto tienen roles distintos:
-
-| Aspecto | MCP Server (`mcp/`) | Service Layer (`service/`) |
+| Aspecto | MCP Server (`jira_mcp/`) | Service Layer (`service/`) |
 |---|---|---|
 | Propósito | Interfaz entre Claude y el sistema | Lógica de negocio + seguridad |
 | Invocado por | Claude Code (LLM) | MCP server + CLI |
-| Contiene lógica | No — solo delega | Sí — sanitización, audit, validación |
+| Contiene lógica | No — solo delega | Sí — sanitización, audit, validación, project registry |
 | Protocolo | MCP (SSE) | HTTP/REST (FastAPI) |
 | Autenticación | API key MCP + IP + RBAC | PAT Jira, API key Anthropic |
 
@@ -219,39 +219,68 @@ Un error común es confundir ambos componentes. En este proyecto tienen roles di
 
 ---
 
-## 8. Proyectos Jira integrados
+## 8. Herramientas MCP implementadas
 
-| Proyecto | Key | Descripción | Estado |
+| Tool | Rol mínimo | Endpoint service layer | Descripción |
 |---|---|---|---|
-| Desarrollo / bugs | `ZNRX` | Tickets de desarrollo del equipo | ✅ Activo (`JIRA_PROJECT_KEY=ZNRX`) |
-| Solicitudes Release | `SAZ` | Solicitudes DevOps: reinicios, deploys, repos, accesos | Fase 5 — futura |
-
-### Relación ZNRX ↔ SAZ
-
-Un ticket SAZ es autónomo pero habitualmente se vincula a un ZNRX como documentación y justificación de la solicitud:
-
-```
-ZNRX-1234  (feature / bug en desarrollo)
-    └── SAZ-7177  (link: "relates to" — solicitud de deploy al equipo de Release)
-```
-
-El link se crea vía `POST /rest/api/2/issueLink`. El tipo de link exacto está pendiente de confirmar contra `jira.zurich.com/rest/api/2/issueLinkType`.
+| `create_jira_issue` | dev | `POST /issues` | Crea ticket desde texto; `project` opcional |
+| `update_jira_issue` | lead | `PATCH /issues/{key}` | Actualiza ticket desde texto |
+| `get_jira_issue` | dev | `GET /issues/{key}/summary` | Resumen Claude del ticket |
+| `search_jira_issues` | dev | `POST /issues/search` | Búsqueda NL; `project` opcional |
+| `add_comment_jira_issue` | dev | `POST /issues/{key}/comments` | Añade comentario |
+| `link_jira_issues` | dev | `POST /issues/{key}/link` | Relaciona dos tickets |
+| `assign_jira_issue` | lead | `POST /issues/{key}/assign` | Asigna un responsable |
+| `set_priority_jira_issue` | lead | `POST /issues/{key}/priority` | Cambia la prioridad |
+| `create_saz_request` | lead | `POST /issues/saz` | Crea ticket SAZ; `znrx_key` opcional |
 
 ---
 
-## 9. Comparativa de opciones para integración LLM-Jira
+## 9. Proyectos Jira integrados
+
+| Proyecto | Key | Descripción | Config |
+|---|---|---|---|
+| Gestión requerimientos | `ZNRX` | Features, bugs y tareas del equipo | seed — constraints curados |
+| IA y automatización | `AIPROJECTS` | Proyectos IA internacionales | seed — TICKET_LANG=en |
+| Desarrollo LATAM | `SCRX` | Desarrollo ágil Ecuador/LATAM | seed |
+| Solicitudes Release | `SAZ` | DevOps: reinicios, deploys, repos, accesos | jira_auto |
+| Cualquier otro | `*` | Auto-descubierto en primer acceso | jira_auto |
+
+### Auto-discovery de proyectos
+
+El sistema no requiere configuración manual para nuevos proyectos. Al primer acceso a un proyecto desconocido:
+
+```
+GET /projects/NEWTEAM
+→ DB miss → GET /rest/api/2/project/NEWTEAM → 200 OK
+→ createmeta (intento; ignorado si 403/404)
+→ INSERT INTO projects (source: "jira_auto")
+→ {"project_key": "NEWTEAM", "discovery_source": "jira_auto", ...}
+```
+
+### Relación ZNRX ↔ SAZ
+
+```
+ZNRX-1234  (feature / bug en desarrollo)
+    └── SAZ-7403  (link: "Relates" — solicitud de deploy al equipo de Release)
+```
+
+El link se crea automáticamente si se provee `znrx_key` en `POST /issues/saz`.
+
+---
+
+## 10. Comparativa de opciones para integración LLM-Jira
 
 | Opción | Viabilidad Zurich | Seguridad | Esfuerzo | Recomendación |
 |---|---|---|---|---|
 | MCP oficial Atlassian (`atlassian.com`) | ❌ Solo Jira Cloud | ❌ Datos salen de la red | Bajo | Descartar |
 | N8N / Zapier | ❌ Servicios cloud | ❌ Datos en terceros | Bajo | Descartar |
 | CLI directo (Fase 1) | ✅ | ⚠️ Sin sanitización | Bajo | Solo prototipo |
-| Service Layer + CLI (Fase 2-3) | ✅ | ✅ | Medio | Producción básica |
-| MCP Server interno (Fase 4) | ✅ | ✅ Auth+RBAC+rate limit | Medio-Alto | **Producción — estado actual** |
+| Service Layer + CLI (Fases 2-3) | ✅ | ✅ | Medio | Producción básica |
+| MCP Server interno (Fases 4+) | ✅ | ✅ Auth+RBAC+rate limit | Medio-Alto | **Producción — estado actual** |
 
 ---
 
-## 10. Estado de implementación y roadmap
+## 11. Estado de implementación
 
 ```
 ✅ Fase 1 — Prototipo CLI
@@ -266,22 +295,37 @@ El link se crea vía `POST /rest/api/2/issueLink`. El tipo de link exacto está 
 ✅ Fase 4 — MCP Server
    └── SSE Docker + API key + IP allowlist + RBAC + rate limit + output normalizado
 
-🔜 Fase 5 — Soporte SAZ (futura)
-   └── Tickets Solicitudes Release Zurich
-   └── znrx_key opcional → link automático SAZ → ZNRX
-   └── Bloqueante: inspeccionar issueLinkType y createmeta SAZ
+✅ Fase 4.1 — Ajustes e2e + TICKET_LANG
+✅ Fase 4.2 — Deuda técnica (52 unit tests, JQL injection fix, rate limiter compartido)
+✅ Fase 4.3 — Transiciones y Log Work
+✅ Fase 4.4 — Mejoras API (comments, assign, priority, labels, clone)
+✅ Fase 4.5 — Link dinámico (tipos reales de Jira, cache TTL 1h)
 
-⬜ Fase 6 — Observabilidad (opcional)
+✅ Fase 5 — Soporte SAZ
+   └── POST /issues/saz + MCP tool create_saz_request (lead)
+   └── znrx_key opcional → link Relates automático
+
+⬜ Fase 6 — Observabilidad (futura)
    └── Prometheus + OpenTelemetry + caching
+
+✅ Fase 7 — Multi-proyecto
+   └── project opcional en create/search; config dinámica por proyecto
+
+✅ Fase 7b — SQLite auto-discovery
+   └── Cualquier proyecto Jira válido se registra en el primer acceso
+   └── GET /projects + GET /projects/{key}
+
+⬜ Fase 8 — UI (futura)
+   └── Interfaz web para usuarios no técnicos
 ```
 
 ---
 
-## 11. Referencias
+## 12. Referencias
 
 - [MCP Specification](https://spec.modelcontextprotocol.io)
 - [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
 - [Anthropic MCP Docs](https://docs.anthropic.com/en/docs/agents-and-tools/mcp)
 - Jira REST API v2: `https://jira.zurich.com/rest/api/2/`
 - Jira issue links: `GET /rest/api/2/issueLinkType`
-- Jira create meta: `GET /rest/api/2/issue/createmeta?projectKeys=SAZ`
+- Jira project meta: `GET /rest/api/2/project/{key}`

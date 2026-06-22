@@ -6,8 +6,9 @@ from fastapi import FastAPI
 
 load_dotenv()
 
-from .routes import actions_router, assign_router, clone_router, comments_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
+from .routes import actions_router, assign_router, clone_router, comments_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
 from .clients.project_db import init_db, seed
+from .git.repo_registry import init_repo_registry
 
 _ENV = os.environ.get("APP_ENV", "dev").lower()
 _docs_url = "/docs" if _ENV == "dev" else None
@@ -43,6 +44,7 @@ _SEED_PROJECTS = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_repo_registry()
     for key, cfg in _SEED_PROJECTS.items():
         seed(key, cfg)
     yield
@@ -58,6 +60,7 @@ app = FastAPI(
 )
 
 app.include_router(actions_router)
+app.include_router(git_repos_router)
 app.include_router(git_sync_router)
 app.include_router(assign_router)
 app.include_router(clone_router)

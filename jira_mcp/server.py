@@ -187,7 +187,11 @@ def _make_tools() -> list[Tool]:
                 "properties": {
                     "repo_path": {
                         "type": "string",
-                        "description": "Absolute path to the local Git repository (e.g. /home/user/repos/auth-service)",
+                        "description": "Absolute path to the local Git repository (e.g. /home/user/repos/auth-service). Mutually exclusive with repo_name.",
+                    },
+                    "repo_name": {
+                        "type": "string",
+                        "description": "Registered repo alias (e.g. 'auth-service'). Resolves path and defaults from registry. Mutually exclusive with repo_path.",
                     },
                     "since_days": {
                         "type": "integer",
@@ -207,6 +211,48 @@ def _make_tools() -> list[Tool]:
                     },
                 },
                 "required": ["repo_path"],
+            },
+        ),
+        Tool(
+            name="register_git_repo",
+            description="Register a local Git repository in the repo registry, associating it with a Jira project and optional default ticket. Registered repos can be referenced by name in sync_git_worklogs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Short alias for the repo (e.g. 'auth-service')",
+                        "maxLength": 100,
+                    },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Absolute path to the local Git repository (e.g. /home/user/repos/auth-service)",
+                        "maxLength": 500,
+                    },
+                    "jira_project": {
+                        "type": "string",
+                        "description": "Default Jira project key for this repo (e.g. ZNRX, AIPROJECTS)",
+                    },
+                    "default_issue_key": {
+                        "type": "string",
+                        "description": "Default Jira ticket to log work against when no issue key is found in commits (e.g. ZNRX-100)",
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "description": "Set as the default repo for git sync when no repo_path or repo_name is given",
+                        "default": False,
+                    },
+                },
+                "required": ["name", "repo_path"],
+            },
+        ),
+        Tool(
+            name="list_git_repos",
+            description="List all registered Git repositories in the repo registry.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
             },
         ),
         Tool(
@@ -287,11 +333,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.add_comment(arguments["key"], arguments["text"], user)
         elif name == "link_jira_issues":
             result = service_client.link_issues(arguments["key"], arguments["text"], user)
+        elif name == "register_git_repo":
+            result = service_client.register_git_repo(
+                name=arguments["name"],
+                repo_path=arguments["repo_path"],
+                user=user,
+                jira_project=arguments.get("jira_project"),
+                default_issue_key=arguments.get("default_issue_key"),
+                is_default=arguments.get("is_default", False),
+            )
+        elif name == "list_git_repos":
+            result = service_client.list_git_repos(user=user)
         elif name == "create_saz_request":
             result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user)
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
-                repo_path=arguments["repo_path"],
+                repo_path=arguments.get("repo_path"),
+                repo_name=arguments.get("repo_name"),
                 user=user,
                 since_days=arguments.get("since_days", 1),
                 dry_run=arguments.get("dry_run", True),

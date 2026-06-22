@@ -1,4 +1,4 @@
-from .git_schemas import GitSessionResult, GitSyncRequest, GitSyncResponse
+from .git_schemas import GitRepoCreateRequest, GitRepoEntry, GitRepoListResponse, GitSessionResult, GitSyncRequest, GitSyncResponse
 from .issue import (
     ActionsRequest,
     ActionsResponse,
@@ -44,6 +44,9 @@ from .issue import (
 )
 
 __all__ = [
+    "GitRepoCreateRequest",
+    "GitRepoEntry",
+    "GitRepoListResponse",
     "GitSessionResult",
     "GitSyncRequest",
     "GitSyncResponse",

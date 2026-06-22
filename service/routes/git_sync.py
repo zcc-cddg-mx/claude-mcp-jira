@@ -10,6 +10,7 @@ from ..schemas import GitSessionResult, GitSyncRequest, GitSyncResponse
 from ..schemas.issue import LogWorkPayload
 from ..git.scanner import get_commits, get_current_branch
 from ..git.analyzer import group_sessions
+from ..git.repo_registry import resolve_repo
 
 _logger = logging.getLogger(__name__)
 
@@ -30,10 +31,28 @@ async def git_sync_endpoint(
     except RuntimeError as e:
         raise HTTPException(status_code=429, detail=str(e))
 
-    # Validate repo path — must be absolute and within filesystem (basic check)
-    repo_path = body.repo_path.strip()
+    # Resolve repo_path: explicit path > name lookup > registry default
+    repo_entry = None
+    if body.repo_name:
+        repo_entry = resolve_repo(body.repo_name)
+        if not repo_entry:
+            raise HTTPException(status_code=404, detail=f"Repo '{body.repo_name}' no registrado. Usa POST /git/repos para registrarlo.")
+        repo_path = repo_entry["repo_path"]
+    elif body.repo_path:
+        repo_path = body.repo_path.strip()
+        # Also try to find matching registry entry by path for defaults
+        repo_entry = resolve_repo(repo_path)
+    else:
+        # No path or name — try registry default
+        repo_entry = resolve_repo(None)
+        if not repo_entry:
+            raise HTTPException(status_code=422, detail="Se requiere repo_path o repo_name, o registra un repo por defecto.")
+        repo_path = repo_entry["repo_path"]
+
     if not os.path.isabs(repo_path):
         raise HTTPException(status_code=422, detail="repo_path debe ser una ruta absoluta.")
+
+    _registry_default_key = repo_entry["default_issue_key"] if repo_entry else None
 
     # Read commits
     _input = f"repo={repo_path} days={body.since_days} dry_run={body.dry_run}"
@@ -58,6 +77,13 @@ async def git_sync_endpoint(
                     s["issue_key"] = parse_git_sync_fallback(s["messages"], branch)
                 except Exception as e:
                     _logger.warning("git_sync fallback failed: %s", e)
+
+    # Registry default_issue_key fallback: if still no key, use repo default
+    if _registry_default_key:
+        for s in sessions_raw:
+            if not s["issue_key"]:
+                s["issue_key"] = _registry_default_key
+                s["confidence"] = "low"
 
     # Build result sessions and optionally register worklogs
     result_sessions: list[GitSessionResult] = []

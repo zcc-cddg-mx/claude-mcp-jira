@@ -99,8 +99,12 @@ def create_saz(text: str, znrx_key, user: str) -> dict:
         return result
 
 
-def sync_git_worklogs(repo_path: str, user: str, since_days: int = 1, dry_run: bool = True, author: str = None) -> dict:
-    body: dict = {"repo_path": repo_path, "since_days": since_days, "dry_run": dry_run}
+def sync_git_worklogs(repo_path: str = None, user: str = "anonymous", since_days: int = 1, dry_run: bool = True, author: str = None, repo_name: str = None) -> dict:
+    body: dict = {"since_days": since_days, "dry_run": dry_run}
+    if repo_path:
+        body["repo_path"] = repo_path
+    if repo_name:
+        body["repo_name"] = repo_name
     if author:
         body["author"] = author
     with _client(user) as c:
@@ -125,6 +129,32 @@ def sync_git_worklogs(repo_path: str, user: str, since_days: int = 1, dry_run: b
             ],
             "worklogs_registered": d["worklogs_registered"],
         }
+
+
+def register_git_repo(
+    name: str,
+    repo_path: str,
+    user: str,
+    jira_project: str = None,
+    default_issue_key: str = None,
+    is_default: bool = False,
+) -> dict:
+    body: dict = {"name": name, "repo_path": repo_path, "is_default": is_default}
+    if jira_project:
+        body["jira_project"] = jira_project
+    if default_issue_key:
+        body["default_issue_key"] = default_issue_key
+    with _client(user) as c:
+        r = c.post("/git/repos", json=body)
+        r.raise_for_status()
+        return r.json()
+
+
+def list_git_repos(user: str) -> dict:
+    with _client(user) as c:
+        r = c.get("/git/repos")
+        r.raise_for_status()
+        return r.json()
 
 
 def search_issues(query: str, user: str, project: str = None) -> dict:

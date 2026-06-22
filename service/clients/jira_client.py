@@ -119,35 +119,43 @@ def log_work(key: str, payload: LogWorkPayload) -> None:
 
 
 def clone_issue(source_key: str, source: dict, payload) -> str:
+    project = _project_from_key(source_key)
+    cfg = get_config(project)
     f = source["fields"]
-    issuetype = _ISSUETYPE_FALLBACK.get(f["issuetype"]["name"], f["issuetype"]["name"])
+
+    issuetype_name = f["issuetype"]["name"]
+    issuetype = cfg["issuetype_fallback"].get(issuetype_name, issuetype_name)
     parent = f.get("parent")
 
     summary = (payload.summary or f.get("summary", ""))[:100]
     description = payload.description or f.get("description", "") or ""
 
     fields: dict = {
-        "project": {"key": _JIRA_PROJECT_KEY},
+        "project": {"key": project},
         "summary": summary,
         "description": description,
         "issuetype": {"name": issuetype},
     }
 
     if parent:
-        # Subtasks: link to parent, no customfield_25832/priority (not on subtask screen)
+        # Subtasks: link to parent, no required_custom/priority (not on subtask screen)
         fields["parent"] = {"key": parent["key"]}
     else:
-        # Top-level issues: Línea de Servicio required + priority
-        fields["customfield_25832"] = _LINEA_SERVICIO_BAU
+        # Top-level: inject required custom fields (e.g. customfield_25832 in ZNRX)
+        for field_key, field_val in cfg["required_custom"].items():
+            fields[field_key] = field_val
+
         priority_name = (f.get("priority") or {}).get("name", "Low")
-        priority_id = _PRIORITY_IDS.get(priority_name)
-        if priority_id:
-            fields["priority"] = {"id": priority_id}
+        if cfg["priority_format"] == "id":
+            priority_id = cfg["priority_ids"].get(priority_name)
+            if priority_id:
+                fields["priority"] = {"id": priority_id}
+        else:
+            fields["priority"] = {"name": priority_name}
 
     new_key = _post("/rest/api/2/issue", {"fields": fields})["key"]
 
-    # Link types: "Cloners" id=10001 — outward="clones", inward="is cloned by"
-    # Only create link for top-level issues; subtasks are already tied to parent
+    # Only link top-level issues; subtasks are already tied to parent
     if not parent:
         _post_noret("/rest/api/2/issueLink", {
             "type": {"name": "Cloners"},

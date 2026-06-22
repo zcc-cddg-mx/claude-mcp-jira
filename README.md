@@ -86,7 +86,8 @@ En `.env`, `REQUESTS_CA_BUNDLE` apunta al cert del endpoint que se va a llamar. 
 | 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy; `GET /projects` |
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
-| 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT; preview human-in-the-loop |
+| 8a — PAT dinámico | Futura | `X-Jira-Token` header opcional — cada usuario opera con su propia identidad Jira |
+| 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
 | 9 — Git Intelligence | Futura | Mapear commits→tickets, estimar y registrar worklogs automáticamente; MCP tool `sync_git_worklogs` |
 
 ## Documentación

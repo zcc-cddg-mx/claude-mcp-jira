@@ -175,7 +175,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
 | Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
-| 8 — UI | Futura | Streamlit MVP → Next.js; login PAT → JWT; preview human-in-the-loop; solo si hay demanda no-técnica demostrada |
+| 8a — PAT dinámico | Futura | `X-Jira-Token` header opcional — cada usuario opera con su propia identidad Jira; sin infraestructura adicional |
+| 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
 | 9 — Git Intelligence | Futura | Leer repos locales, mapear commits→tickets, registrar worklogs automáticamente con preview — `sync_git_worklogs` MCP tool |
 
 ## Test tickets (limpieza)

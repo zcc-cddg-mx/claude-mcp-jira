@@ -21,6 +21,13 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
+- [ ] **Fase 8a — PAT dinámico por usuario** *(futura — corto plazo, bajo esfuerzo)*
+  - `X-Jira-Token` header opcional en service layer — sobreescribe `JIRA_PAT` del `.env`
+  - Sin header → usa cuenta de servicio (comportamiento actual, sin ruptura)
+  - Cambios: `ContextVar` en `jira_client.py` + middleware FastAPI + parámetro MCP opcional
+  - Habilita autoría correcta en Jira y es el fundamento de Fase 8 UI
+  - Ver plan completo en `arch/design/implementation-plan.md` → Fase 8a
+
 - [ ] **Fase 8 — UI** *(futura — solo si hay demanda no-técnica demostrada)*
   - Ver `arch/evaluations/eval-ui-copilot.md` y evaluación en `arch/design/implementation-plan.md`
   - Recomendación: Streamlit MVP primero; migrar a Next.js si hay adopción real

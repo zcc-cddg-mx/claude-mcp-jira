@@ -313,6 +313,122 @@ Compartir el MCP server con otros equipos implica que usuarios distintos acceder
 
 ---
 
+## Fase 8a — PAT dinámico por usuario
+
+**Objetivo**: permitir que cada usuario opere con su propia identidad Jira en lugar de la cuenta de servicio compartida, sin infraestructura adicional.
+
+### Problema
+
+El `JIRA_PAT` en `.env` es un único PAT de cuenta de servicio. Todos los tickets se crean con esa identidad — en Jira aparecen como del mismo autor, independientemente de quién ejecutó la acción.
+
+### Solución: header `X-Jira-Token` opcional
+
+El service layer acepta un header `X-Jira-Token` en cada request. Si está presente, sobreescribe el PAT de `.env` para esa llamada. Si no, usa el PAT de servicio como fallback.
+
+```
+Request con X-Jira-Token:
+  → jira_client usa ese PAT → ticket aparece como autor real en Jira
+
+Request sin X-Jira-Token:
+  → jira_client usa JIRA_PAT del .env → comportamiento actual (cuenta de servicio)
+```
+
+### Por qué esta opción
+
+| Opción | Coste | Autoría correcta | Infraestructura |
+|---|---|---|---|
+| A — `X-Jira-Token` header (esta) | Bajo — horas | ✅ Sí | Ninguna |
+| B — PAT único de servicio (actual) | Cero | ❌ No | Ninguna |
+| C — Vault / DB cifrada (Fase 8 UI) | Alto — días | ✅ Sí | Vault o cifrado |
+
+La Opción A desbloquea multi-usuario hoy. La Opción C es la evolución natural cuando se implemente la UI (Fase 8) — el login almacenaría el PAT en sesión y lo propagaría en cada request de forma transparente.
+
+### Cambios necesarios
+
+**`service/clients/jira_client.py`** — leer el token de contexto:
+
+```python
+# Variable de contexto por request (threading o contextvars)
+_request_pat: ContextVar[str | None] = ContextVar("request_pat", default=None)
+
+def _get_headers() -> dict:
+    pat = _request_pat.get() or _JIRA_PAT
+    return {"Authorization": f"Bearer {pat}", "Accept": "application/json"}
+```
+
+**Middleware o dependency en FastAPI** — extraer el header y inyectarlo en el contexto:
+
+```python
+# service/middleware/jira_auth.py
+async def jira_auth_middleware(request: Request, call_next):
+    token = request.headers.get("X-Jira-Token")
+    if token:
+        _request_pat.set(token)
+    return await call_next(request)
+```
+
+**MCP server** — propagar el header si el cliente lo pasa en el tool call:
+
+```python
+# jira_mcp/server.py — añadir parámetro opcional jira_token a cada tool
+# El MCP server lo reenvía como X-Jira-Token al service layer
+```
+
+### Flujo de uso (CLI y MCP)
+
+```bash
+# CLI — con PAT propio
+X_JIRA_TOKEN=<mi-pat> python cli/main.py create "bug login en producción"
+
+# Service layer directo
+curl -X POST http://localhost:18000/issues \
+  -H "X-Jira-Token: <mi-pat>" \
+  -H "x-user: carlos.duarte2" \
+  -d '{"text": "bug login en producción"}'
+
+# MCP tool — Claude Code pasa el token si está configurado
+# (o usa el de servicio si no se configura)
+```
+
+### Seguridad
+
+- El token viaja solo dentro de la red corporativa (HTTP interno)
+- El service layer nunca loguea el valor del PAT — solo loguea si estaba presente (`pat_source: header | env`)
+- Sanitizer ya elimina patrones de token de los audit logs
+- La validación del PAT la hace Jira — si es inválido, devuelve 401 que se propaga como 502
+
+### Entregables
+
+- `service/clients/jira_client.py` — `ContextVar` + `_get_headers()` dinámico
+- `service/middleware/jira_auth.py` — extrae `X-Jira-Token` y lo inyecta en contexto
+- `service/main.py` — registrar middleware
+- `jira_mcp/server.py` — parámetro `jira_token` opcional; propagado como header al service layer
+- `service/audit.py` — añadir campo `pat_source: "header" | "env"` al audit log
+- Tests unitarios: header presente sobreescribe env; sin header usa env; token nunca en logs
+
+### Criterio de éxito
+
+```bash
+# Con PAT propio: ticket en Jira aparece como autor "carlos.duarte2"
+curl -X POST http://localhost:18000/issues \
+  -H "X-Jira-Token: <pat-carlos>" -H "x-user: carlos.duarte2" \
+  -d '{"text": "[MCP Claude Jira Test] con PAT propio"}'
+→ ticket creado con reporter = carlos.duarte2 en Jira
+
+# Sin header: usa cuenta de servicio (comportamiento actual)
+curl -X POST http://localhost:18000/issues \
+  -H "x-user: carlos.duarte2" \
+  -d '{"text": "[MCP Claude Jira Test] sin PAT header"}'
+→ ticket creado con reporter = cuenta de servicio
+```
+
+### Relación con otras fases
+
+- **Fase 8 (UI)**: el login captura el PAT, lo guarda en sesión JWT, y lo propaga automáticamente en cada request como `X-Jira-Token`. El usuario no necesita gestionarlo manualmente.
+- **Fase 9 (Git Intelligence)**: `sync_git_worklogs` acepta `jira_token` opcional para registrar worklogs con la identidad correcta.
+
+---
+
 ## Fase 8 — Interfaz UI
 
 > Evaluación basada en `arch/evaluations/eval-ui-copilot.md`.

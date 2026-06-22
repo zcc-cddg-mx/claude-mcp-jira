@@ -3,17 +3,17 @@ from fastapi import APIRouter, Header, HTTPException
 from ..audit import log, new_request_id
 from ..clients import get_labels, parse_labels, rate_limit_check, update_labels
 from ..clients.sanitizer import sanitize
-from ..schemas import ActionsRequest, ActionsResponse
+from ..schemas import LabelsRequest, LabelsResponse
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
 _VALID_OPERATIONS = {"set", "add", "remove"}
 
 
-@router.post("/{key}/labels", response_model=ActionsResponse)
+@router.post("/{key}/labels", response_model=LabelsResponse)
 async def labels_endpoint(
     key: str,
-    body: ActionsRequest,
+    body: LabelsRequest,
     x_user: str = Header(default="anonymous"),
 ):
     rid = new_request_id()
@@ -67,4 +67,4 @@ async def labels_endpoint(
         jira_key=key,
         status="ok",
     )
-    return ActionsResponse(key=key, action=f"labels_{payload.operation}", labels=final)
+    return LabelsResponse(key=key, operation=payload.operation, labels=final)

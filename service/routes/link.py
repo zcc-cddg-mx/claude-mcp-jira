@@ -11,7 +11,11 @@ meta_router = APIRouter(tags=["meta"])
 
 
 @meta_router.get("/issue-link-types", response_model=List[LinkTypeItem])
-async def list_link_types():
+async def list_link_types(x_user: str = Header(default="anonymous")):
+    try:
+        rate_limit_check(x_user)
+    except RuntimeError as e:
+        raise HTTPException(status_code=429, detail=str(e))
     try:
         return get_link_types()
     except Exception as e:
@@ -42,6 +46,9 @@ async def link_issue_endpoint(
         log(request_id=rid, user=x_user, action="link_issue", input_text=body.text,
             jira_key=key, status="error", error=f"claude: {e}")
         raise HTTPException(status_code=422, detail=f"Claude parsing failed: {sanitize(str(e))}")
+
+    if payload.target_key.upper() == key.upper():
+        raise HTTPException(status_code=422, detail="No se puede enlazar un ticket consigo mismo.")
 
     try:
         link_issue(key, payload.target_key, payload.link_type_name, payload.source_is_outward)

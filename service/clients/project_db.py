@@ -28,7 +28,8 @@ import requests
 
 _logger = logging.getLogger(__name__)
 
-_DB_PATH = os.environ.get("PROJECT_DB_PATH", "projects.db")
+_DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "projects.db")
+_DB_PATH = os.environ.get("PROJECT_DB_PATH", _DEFAULT_DB_PATH)
 _JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 _JIRA_PAT = os.environ.get("JIRA_PAT", "")
 _CA_BUNDLE = os.environ.get("REQUESTS_CA_BUNDLE", True)

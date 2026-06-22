@@ -10,15 +10,15 @@
 
 | # | Área | Hallazgo | Severidad | Estado |
 |---|---|---|---|---|
-| 1 | Tests | 9 endpoints sin cobertura e2e | Alta | Pendiente |
-| 2 | Link (4.5) | No valida source != target (auto-link) | Media | Pendiente |
-| 3 | Endpoints GET públicos | `/issue-link-types`, `/projects`, `/projects/{key}` sin rate limit ni auth | Media | Pendiente |
-| 4 | Multi-proyecto (7b) | `resolve_project` llama `get_or_discover` antes de verificar allowlist | Media | Pendiente |
-| 5 | SAZ (5) | `znrx_key` sin validación de formato ni existencia previa | Baja | Pendiente |
-| 6 | Labels (4.4) | Usa `ActionsRequest/ActionsResponse` en lugar de schemas dedicados | Baja | Pendiente |
-| 7 | Assign (4.4) | `assignee` acepta string vacío → Jira recibe `{"name": ""}` | Baja | Pendiente |
-| 8 | Worklog (4.3) | `time_spent_seconds` sin mínimo — permite registrar 0 segundos | Baja | Pendiente |
-| 9 | SQLite (7b) | `PROJECT_DB_PATH` relativo — ambiguo si el cwd cambia fuera de Docker | Baja | Pendiente |
+| 1 | Tests | 9 endpoints sin cobertura e2e | Alta | ✅ Resuelto |
+| 2 | Link (4.5) | No valida source != target (auto-link) | Media | ✅ Resuelto |
+| 3 | Endpoints GET públicos | `/issue-link-types`, `/projects`, `/projects/{key}` sin rate limit ni auth | Media | ✅ Resuelto |
+| 4 | Multi-proyecto (7b) | `resolve_project` llama `get_or_discover` antes de verificar allowlist | Media | ✅ Mitigado (H3) |
+| 5 | SAZ (5) | `znrx_key` sin validación de formato ni existencia previa | Baja | ✅ Resuelto |
+| 6 | Labels (4.4) | Usa `ActionsRequest/ActionsResponse` en lugar de schemas dedicados | Baja | ✅ Resuelto |
+| 7 | Assign (4.4) | `assignee` acepta string vacío → Jira recibe `{"name": ""}` | Baja | ✅ Resuelto |
+| 8 | Worklog (4.3) | `time_spent_seconds` sin mínimo — permite registrar 0 segundos | Baja | ✅ Resuelto |
+| 9 | SQLite (7b) | `PROJECT_DB_PATH` relativo — ambiguo si el cwd cambia fuera de Docker | Baja | ✅ Resuelto |
 
 ---
 
@@ -48,6 +48,10 @@ Flujo sugerido:
 2. Ejercitar cada endpoint en orden lógico (comments → assign → priority → labels → worklog → transition → clone → link → saz)
 3. Limpiar tickets creados al finalizar
 
+### ✅ Resuelto
+
+`scripts/test-actions.sh` creado — 24/24 tests passing. Cubre los 9 endpoints + validaciones H2 y H5.
+
 ---
 
 ## Hallazgo 2 — Link: no valida source != target (MEDIA)
@@ -75,6 +79,10 @@ if payload.target_key.upper() == key.upper():
 ### Archivos afectados
 - `service/routes/link.py` — 1 línea
 
+### ✅ Resuelto
+
+Check añadido en `service/routes/link.py`. Validado con test 8b en `test-actions.sh` (devuelve 422).
+
 ---
 
 ## Hallazgo 3 — Endpoints GET públicos sin rate limit ni auth (MEDIA)
@@ -101,6 +109,10 @@ Para `GET /projects/{key}` específicamente: la discovery call a Jira ocurre sol
 - `service/routes/link.py` — `list_link_types()`
 - `service/routes/projects.py` — `list_projects_endpoint()` y `get_project_endpoint()`
 
+### ✅ Resuelto
+
+`x_user` + `rate_limit_check` añadidos en los tres endpoints. Validado con test 10 en `test-actions.sh`.
+
 ---
 
 ## Hallazgo 4 — `resolve_project` llama `get_or_discover` antes del allowlist check (MEDIA)
@@ -123,6 +135,10 @@ Espera — el orden real es: primero check allowlist, luego `get_or_discover`. P
 ### Fix propuesto
 
 Sin cambios de código por ahora — el hallazgo 3 (rate limit en endpoints GET) mitiga el riesgo. Documentar como deuda a revisar si se vacía la allowlist.
+
+### ✅ Mitigado (H3)
+
+Rate limit añadido en todos los endpoints GET públicos (H3). Sin cambios adicionales de código.
 
 ---
 
@@ -155,6 +171,10 @@ Devuelve 422 con mensaje claro antes de llegar a Jira.
 ### Archivos afectados
 - `service/schemas/issue.py` — `CreateSAZRequest.znrx_key`
 
+### ✅ Resuelto
+
+`pattern=r'^[A-Z][A-Z0-9]+-\d+$'` añadido en `CreateSAZRequest.znrx_key`. Validado con test 9b en `test-actions.sh` (devuelve 422).
+
 ---
 
 ## Hallazgo 6 — Labels usa schemas genéricos de `/actions` (BAJA)
@@ -176,6 +196,10 @@ Crear `LabelsRequest(text: str)` y `LabelsResponse(key, operation, labels)` en `
 ### Archivos afectados
 - `service/schemas/issue.py` — añadir 2 schemas
 - `service/routes/labels.py` — cambiar imports y tipos
+
+### ✅ Resuelto
+
+`LabelsRequest` y `LabelsResponse` creados en `schemas/issue.py`. `labels.py` actualizado, `__init__.py` exporta los nuevos schemas.
 
 ---
 
@@ -203,6 +227,10 @@ String vacío se normaliza a `None` (desasignar) o se rechaza con 422.
 ### Archivos afectados
 - `service/schemas/issue.py` — `AssignIssuePayload.assignee`
 
+### ✅ Resuelto
+
+`assignee: Optional[str] = Field(None, min_length=1)` en `AssignIssuePayload`.
+
 ---
 
 ## Hallazgo 8 — Worklog sin mínimo en `time_spent_seconds` (BAJA)
@@ -226,6 +254,10 @@ time_spent_seconds: int = Field(..., ge=60)   # mínimo 1 minuto — Jira ignora
 
 ### Archivos afectados
 - `service/schemas/issue.py` — `LogWorkPayload.time_spent_seconds`
+
+### ✅ Resuelto
+
+`time_spent_seconds: int = Field(..., ge=60)` en `LogWorkPayload`.
 
 ---
 
@@ -252,6 +284,10 @@ O simplemente documentar que `PROJECT_DB_PATH` debe ser absoluto en entornos no-
 
 ### Archivos afectados
 - `service/clients/project_db.py` — 1 línea
+
+### ✅ Resuelto
+
+`_DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "projects.db")` — resuelve relativo al módulo.
 
 ---
 

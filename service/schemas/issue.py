@@ -93,7 +93,7 @@ class LogWorkRequest(BaseModel):
 
 
 class LogWorkPayload(BaseModel):
-    time_spent_seconds: int = Field(..., gt=0)
+    time_spent_seconds: int = Field(..., ge=60)
     comment: Optional[str] = None
     started: Optional[str] = None
 
@@ -122,7 +122,7 @@ class AssignIssueRequest(BaseModel):
 
 
 class AssignIssuePayload(BaseModel):
-    assignee: Optional[str] = None
+    assignee: Optional[str] = Field(None, min_length=1)
 
 
 class AssignIssueResponse(BaseModel):
@@ -196,9 +196,19 @@ class ActionsResponse(BaseModel):
     labels: list[str]
 
 
+class LabelsRequest(BaseModel):
+    text: str = Field(..., min_length=3, max_length=2000, example="pon los labels: backend, api")
+
+
+class LabelsResponse(BaseModel):
+    key: str
+    operation: str
+    labels: list[str]
+
+
 class CreateSAZRequest(BaseModel):
     text: str = Field(..., min_length=5, max_length=2000, example="solicitar reinicio del servicio de autenticación en producción")
-    znrx_key: Optional[str] = Field(None, example="ZNRX-68126")
+    znrx_key: Optional[str] = Field(None, pattern=r'^[A-Z][A-Z0-9]+-\d+$', example="ZNRX-68126")
 
 
 class SAZIssuePayload(BaseModel):

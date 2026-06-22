@@ -160,6 +160,25 @@ def parse_saz_request(user_input: str) -> SAZIssuePayload:
     return SAZIssuePayload(**_parse_json(raw, "saz_create"))
 
 
+def parse_git_sync_fallback(commit_messages: list[str], branch: str | None) -> str | None:
+    """Ask Claude to identify a Jira key from commit messages when regex found nothing.
+    Returns issue key string or None. Only metadata is sent — no code content."""
+    messages_str = "\n".join(f"- {m}" for m in commit_messages[:20])
+    prompt = _load_prompt("git_sync_fallback").format(
+        branch=sanitize(branch or "(desconocida)"),
+        commit_messages=sanitize(messages_str),
+    )
+    raw = _strip_fences(_call(prompt, max_tokens=64))
+    try:
+        data = _parse_json(raw, "git_sync_fallback")
+        key = data.get("issue_key")
+        if key and isinstance(key, str) and key.strip():
+            return key.strip()
+        return None
+    except Exception:
+        return None
+
+
 def parse_search_query(user_input: str) -> SearchQueryStruct:
     safe_input = sanitize(user_input)
     prompt = _load_prompt("search_issues").format(user_input=safe_input)

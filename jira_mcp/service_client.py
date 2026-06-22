@@ -99,6 +99,34 @@ def create_saz(text: str, znrx_key, user: str) -> dict:
         return result
 
 
+def sync_git_worklogs(repo_path: str, user: str, since_days: int = 1, dry_run: bool = True, author: str = None) -> dict:
+    body: dict = {"repo_path": repo_path, "since_days": since_days, "dry_run": dry_run}
+    if author:
+        body["author"] = author
+    with _client(user) as c:
+        r = c.post("/git/sync", json=body)
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "sessions", "total_commits", endpoint="POST /git/sync")
+        return {
+            "repo": d["repo_path"],
+            "branch": d.get("branch"),
+            "total_commits": d["total_commits"],
+            "dry_run": d["dry_run"],
+            "sessions": [
+                {
+                    "issue_key": s["issue_key"],
+                    "estimated_hours": s["estimated_hours"],
+                    "confidence": s["confidence"],
+                    "commits": s["commit_count"],
+                    "worklog_registered": s["worklog_registered"],
+                }
+                for s in d["sessions"]
+            ],
+            "worklogs_registered": d["worklogs_registered"],
+        }
+
+
 def search_issues(query: str, user: str, project: str = None) -> dict:
     body = {"query": query}
     if project:

@@ -1,3 +1,4 @@
+from .git_schemas import GitSessionResult, GitSyncRequest, GitSyncResponse
 from .issue import (
     ActionsRequest,
     ActionsResponse,
@@ -43,6 +44,9 @@ from .issue import (
 )
 
 __all__ = [
+    "GitSessionResult",
+    "GitSyncRequest",
+    "GitSyncResponse",
     "ActionsRequest",
     "ActionsResponse",
     "AddCommentPayload",

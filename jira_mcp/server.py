@@ -180,6 +180,36 @@ def _make_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="sync_git_worklogs",
+            description="Read a local Git repository, detect work sessions linked to Jira tickets (by commit message or branch name), and optionally register worklogs. Always runs as dry_run=true first to show a preview — set dry_run=false to actually register.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Absolute path to the local Git repository (e.g. /home/user/repos/auth-service)",
+                    },
+                    "since_days": {
+                        "type": "integer",
+                        "description": "How many days back to scan commits (default: 1)",
+                        "default": 1,
+                        "minimum": 1,
+                        "maximum": 30,
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true (default), returns a preview only — no worklogs are registered in Jira. Set to false to register.",
+                        "default": True,
+                    },
+                    "author": {
+                        "type": "string",
+                        "description": "Optional: filter commits by author email (e.g. carlos.duarte2@mx.zurich.com)",
+                    },
+                },
+                "required": ["repo_path"],
+            },
+        ),
+        Tool(
             name="create_saz_request",
             description="Create a SAZ ticket (Solicitud Release Zurich) for DevOps/Release team requests: service restarts, deployments, Git repo management, infrastructure access, environment promotions. Optionally link to a ZNRX ticket.",
             inputSchema={
@@ -259,6 +289,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.link_issues(arguments["key"], arguments["text"], user)
         elif name == "create_saz_request":
             result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user)
+        elif name == "sync_git_worklogs":
+            result = service_client.sync_git_worklogs(
+                repo_path=arguments["repo_path"],
+                user=user,
+                since_days=arguments.get("since_days", 1),
+                dry_run=arguments.get("dry_run", True),
+                author=arguments.get("author"),
+            )
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception as e:

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 load_dotenv()
 
-from .routes import actions_router, assign_router, clone_router, comments_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
+from .routes import actions_router, assign_router, clone_router, comments_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
 from .clients.project_db import init_db, seed
 
 _ENV = os.environ.get("APP_ENV", "dev").lower()
@@ -58,6 +58,7 @@ app = FastAPI(
 )
 
 app.include_router(actions_router)
+app.include_router(git_sync_router)
 app.include_router(assign_router)
 app.include_router(clone_router)
 app.include_router(comments_router)

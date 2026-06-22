@@ -2,9 +2,9 @@ import os
 from typing import Optional
 
 ROLES: dict[str, list[str]] = {
-    "dev":    ["create_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "link_jira_issues"],
-    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request"],
-    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request"],
+    "dev":    ["create_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "link_jira_issues", "sync_git_worklogs"],
+    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs"],
+    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs"],
 }
 
 # Map API key → role. Format: "key1:role1,key2:role2"

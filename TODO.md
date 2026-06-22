@@ -21,9 +21,18 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
-- [ ] **Fase 8 — UI** *(futura — evaluar antes de implementar)*
-  - Ver `arch/evaluations/eval-ui-copilot.md`
-  - Objetivo: interfaz web para usuarios no técnicos sobre los mismos endpoints
+- [ ] **Fase 8 — UI** *(futura — solo si hay demanda no-técnica demostrada)*
+  - Ver `arch/evaluations/eval-ui-copilot.md` y evaluación en `arch/design/implementation-plan.md`
+  - Recomendación: Streamlit MVP primero; migrar a Next.js si hay adopción real
+  - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
+  - Implica añadir `POST /auth/login` y `GET /me` al service layer
+
+- [ ] **Fase 9 — Git Intelligence** *(futura — alta prioridad relativa)*
+  - Ver `arch/evaluations/eval-git-copilot.md` y plan en `arch/design/implementation-plan.md`
+  - Objetivo: leer repos Git locales, mapear commits→tickets, registrar worklogs con preview
+  - MCP tool `sync_git_worklogs(repo_path, since_days)` — funciona sin UI
+  - Sub-fases: 9.1 scanner+mapper, 9.2 estimación+registro, 9.3 MCP tool, 9.4 UI (opcional)
+  - No enviar código a Claude — solo mensajes de commit, nombres de archivo, LOC count
 
 ---
 

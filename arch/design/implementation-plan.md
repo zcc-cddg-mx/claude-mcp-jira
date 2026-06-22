@@ -313,17 +313,209 @@ Compartir el MCP server con otros equipos implica que usuarios distintos acceder
 
 ---
 
-## Fase 8 — Interfaz UI (futura)
+## Fase 8 — Interfaz UI
 
-> Ver evaluación completa en `arch/evaluations/eval-ui-copilot.md` antes de implementar.
+> Evaluación basada en `arch/evaluations/eval-ui-copilot.md`.
 
-**Objetivo**: complementar el acceso CLI/MCP con una interfaz web ligera para usuarios no técnicos.
+**Objetivo**: complementar el acceso CLI/MCP con una interfaz web ligera para usuarios no técnicos del equipo Zurich.
 
-### Líneas a evaluar
-- Stack tecnológico (htmx+FastAPI vs. React standalone vs. extensión VS Code)
-- Alcance: ¿read-only (consulta/resumen) o también write (crear/actualizar)?
-- Auth de usuario en UI vs. API key de servicio
-- La UI consumiría los mismos endpoints del service layer existente
+### Evaluación
+
+#### Valor real para el proyecto
+
+El sistema actual ya cubre a usuarios técnicos vía CLI y Claude Code MCP. La UI añade valor principalmente para:
+- Usuarios que no usan el terminal (PMs, analistas, stakeholders)
+- Flujo "human-in-the-loop" con preview antes de crear/modificar tickets
+- Dashboard de actividad y auditoría visual
+
+La evaluación externa (`eval-ui-copilot.md`) confirma que es viable y diferenciador, pero implica infraestructura adicional (sesiones, JWT, posiblemente Vault para PAT).
+
+#### Decisión de stack
+
+| Opción | Coste | Cuando usar |
+|---|---|---|
+| Streamlit | Bajo — 1-2 días | MVP interno rápido; validar demanda real |
+| htmx + FastAPI | Medio — 1 semana | Si se quiere SPA sin JS moderno |
+| Next.js / React | Alto — 2-3 semanas | Si la UI se convierte en producto propio |
+
+**Recomendación**: empezar con Streamlit sobre los endpoints del service layer existente. Si hay demanda demostrada, migrar a Next.js.
+
+#### Arquitectura
+
+```
+[Streamlit / React]  ──REST──►  [Service Layer FastAPI]  ──►  [Jira / Claude]
+                                 ▲
+                        NO pasa por el MCP server
+```
+
+La UI habla directamente con el service layer. El MCP server es solo para Claude Code.
+
+#### Auth
+
+```
+POST /auth/login {"jira_pat": "..."}
+→ backend valida PAT contra Jira
+→ devuelve JWT {user_id, projects, roles, expiration}
+→ PAT nunca llega al frontend
+```
+
+Implica añadir `POST /auth/login` y `GET /me` al service layer.
+
+#### Alcance MVP recomendado (Fase 8.1)
+
+1. Login con PAT → sesión JWT
+2. Crear ticket con preview (AI + human-in-the-loop)
+3. Buscar y resumir tickets
+
+#### Alcance avanzado (Fase 8.2+, solo si el MVP tiene adopción)
+
+- Dashboard de historial / auditoría
+- Configuración por usuario (proyecto default, idioma)
+- Governance UI (aprobar acciones críticas)
+- Admin panel (gestión API keys MCP, rate limits, roles)
+
+#### Riesgos y mitigaciones
+
+| Riesgo | Mitigación |
+|---|---|
+| PAT expuesto en frontend | PAT nunca sale del backend; solo se emite JWT |
+| Sesiones y expiración | JWT con `expiration`; validar en cada request |
+| Scope creep | Empezar con Streamlit read-only+create; no construir admin panel sin demanda |
+| Esfuerzo vs. adopción | Medir si los no-técnicos realmente usarían la UI antes de invertir en Next.js |
+
+#### Estado
+
+**Pendiente de evaluación de demanda.** Implementar solo si hay usuarios no técnicos concretos que lo requieran. El service layer ya expone todos los endpoints necesarios — la UI es solo la capa de presentación.
+
+---
+
+## Fase 9 — Git Intelligence (futura)
+
+> Evaluación basada en `arch/evaluations/eval-git-copilot.md`.
+
+**Objetivo**: leer repos Git locales, mapear commits a tickets Jira y registrar worklogs automáticamente. Convierte el sistema en un "Engineering Productivity Copilot".
+
+### Evaluación
+
+#### Valor real
+
+El registro manual de worklogs es la fricción más alta del flujo actual. Los commits ya contienen información suficiente para inferir qué ticket se trabajó y cuánto tiempo se dedicó. La propuesta es automatizar ese mapeo con validación humana antes de registrar.
+
+#### Flujo principal
+
+```
+1. git log --since=... (repo local)
+2. Agrupar commits en sesiones (delta < 2h = misma sesión)
+3. Extraer issue key: regex [A-Z]+-\d+ en mensaje o nombre de rama
+4. Si no hay key: Claude como fallback (solo metadata, nunca código completo)
+5. Estimar tiempo: timestamps + LOC cambiados + Claude
+6. Preview: usuario revisa y ajusta antes de registrar
+7. POST /issues/{key}/worklog para cada sesión confirmada
+```
+
+#### Seguridad crítica
+
+- **No enviar código a Claude** — solo mensajes de commit, nombres de archivo y LOC count
+- Sanitizar todo input antes de pasar a Claude (reutilizar `sanitizer.py`)
+- Procesamiento local — ningún dato de código sale de la red interna
+
+#### Estrategias de correlación Git → Jira (por precedencia)
+
+1. **Regex en mensaje de commit**: `r"[A-Z]+-\d+"` — ej. `ZNRX-68171 fix auth timeout`
+2. **Nombre de rama**: `feature/ZNRX-68171-login-fix` → `ZNRX-68171`
+3. **Claude fallback**: si no hay key — prompt con mensaje + archivos modificados, sin contenido de código
+
+#### Estimación de tiempo (heurística combinada)
+
+```python
+# 1. Delta entre commits
+delta = commit_n.timestamp - commit_n_minus_1.timestamp
+if delta < timedelta(hours=2): misma_sesion()
+
+# 2. Límites por sesión
+min_session = timedelta(minutes=15)
+max_session = timedelta(hours=4)
+
+# 3. Ajuste por tamaño
+if loc_changed > 200: sesion *= 1.2
+
+# 4. Claude mejora la estimación (opcional, solo en modo pro)
+# Input: mensajes de commit + LOC (no el diff completo)
+```
+
+#### Nuevos componentes
+
+```
+service/
+└── git/
+    ├── scanner.py    — git.Repo(path).iter_commits(since=...)
+    ├── analyzer.py   — group_sessions(), estimate_time()
+    └── mapper.py     — extract_issue_key(), claude_fallback()
+```
+
+#### Nueva tool MCP
+
+```python
+sync_git_worklogs(
+    repo_path: str,      # path al repo local
+    since_days: int = 1  # días hacia atrás
+)
+```
+
+Flujo desde Claude Code:
+```
+User: "registra mis horas de hoy en el repo auth-service"
+Claude → sync_git_worklogs(repo_path="~/repos/auth-service", since_days=1)
+→ Preview con sesiones detectadas → usuario confirma → worklogs registrados
+```
+
+#### Nuevo endpoint service layer
+
+```http
+POST /git/sync
+{
+  "repo_path": "/home/user/repos/auth-service",
+  "since_days": 1,
+  "dry_run": true
+}
+→ {sessions: [{issue_key, estimated_hours, commits, confidence}]}
+```
+
+Con `dry_run=true` devuelve el preview sin registrar — ideal para la validación human-in-the-loop.
+
+#### Pantalla UI propuesta (si Fase 8 está implementada)
+
+```
+📊 Git Work Summary — auth-service
+
+Sesión 1:  ZNRX-68171  →  2h estimadas  (3 commits)
+Sesión 2:  ZNRX-68183  →  1.5h estimadas (1 commit, rama: feature/ZNRX-68183)
+
+[✅ Confirmar todo]  [✏️ Ajustar]  [❌ Cancelar]
+```
+
+#### Implementación incremental recomendada
+
+| Sub-fase | Descripción | Esfuerzo |
+|---|---|---|
+| 9.1 | Scanner + mapper (regex + rama) + endpoint `/git/sync` dry_run | 1-2 días |
+| 9.2 | Estimación de tiempo + registro real de worklogs | 1-2 días |
+| 9.3 | MCP tool `sync_git_worklogs` + Claude fallback para commits sin key | 1 día |
+| 9.4 | Integración con Fase 8 UI (preview interactivo) | Opcional |
+
+#### Riesgos y mitigaciones
+
+| Riesgo | Mitigación |
+|---|---|
+| Sobreestimación de horas | Preview obligatorio antes de registrar; `dry_run=true` por defecto |
+| Commits sin ticket | Fallback Claude o ignorar (configurable por usuario) |
+| Privacidad del código | Solo metadata a Claude — mensajes, archivos, LOC; nunca el diff |
+| Mono-repo / múltiples proyectos | Mapping dinámico por directorio o rama; configurable en `.env` |
+| Repos en Windows/WSL | `repo_path` como parámetro explícito; no asume CWD |
+
+#### Estado
+
+**Futura — alta prioridad relativa.** El registro de worklogs es la funcionalidad más solicitada y la que más tiempo manual ahorra. No requiere la UI de Fase 8 — el MCP tool es suficiente para usuarios de Claude Code.
 
 ---
 

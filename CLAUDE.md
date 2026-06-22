@@ -92,6 +92,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `POST` | `/issues/{key}/link` | Relacionar tickets (texto libre → Claude → issueLink Jira; tipos dinámicos) |
 | `GET` | `/issue-link-types` | Lista tipos de link reales de Jira (cache TTL 1h) |
 | `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, etc.) — 501 |
+| `POST` | `/issues/saz` | Crear ticket SAZ (DevOps/Release); `znrx_key` opcional para vincularlo |
 | `GET` | `/health` | Health check |
 
 ## MCP server — tools
@@ -106,6 +107,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `link_jira_issues` | dev | Relaciona dos tickets (depends on, blocks, relates, etc.) |
 | `assign_jira_issue` | lead | Asigna un ticket a un usuario |
 | `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
+| `create_saz_request` | lead | Crea ticket SAZ (DevOps/Release); `znrx_key` opcional |
 
 ## Security layers
 
@@ -165,7 +167,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
 | 4.4 — Mejoras API | ✅ Completa | comments, assign, priority, labels, clone; Swagger prod off |
 | 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h |
-| 5 — Soporte SAZ | Futura | Tickets SAZ vinculados a ZNRX — bloqueantes resueltos |
+| 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
 | 6 — Observabilidad | Opcional | Prometheus + OpenTelemetry + caching |
 
 ## Test tickets (limpieza)

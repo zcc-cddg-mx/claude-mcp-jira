@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–4.5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 5 (SAZ).
+Estado general: Fases 1–5 completas. Docker validado (8/8 + 10/10). Jira limpio. Próximo: Fase 6 (Observabilidad, opcional) o Fase 7 (Multi-proyecto).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -14,11 +14,6 @@ Actualizar este archivo al completar o añadir tareas.
 ## Pendiente
 
 ### Implementación
-
-- [ ] **Fase 5 — Soporte SAZ** — tickets Solicitudes Release Zurich vinculados a ZNRX
-  - Bloqueantes resueltos: link type `Relates` (id `10003`), campos SAZ en `docs/jira-fields.md`
-  - Ver plan completo en `arch/design/implementation-plan.md` → Fase 5
-  - Entregables: `service/routes/saz.py`, prompt SAZ, herramienta MCP `create_saz_request`
 
 - [ ] **Fase 6 — Observabilidad** *(opcional — activar cuando el volumen lo justifique)*
   - Métricas Prometheus en `/metrics`
@@ -54,6 +49,11 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] `jira-link-types.md` — 29 link types; recomendación SAZ→ZNRX
   - [x] `jira-workflows.md` — statuses y transiciones por proyecto
 - [x] Fase 5 — bloqueantes resueltos (link type + campos SAZ documentados)
+- [x] Fase 5 — Soporte SAZ implementado:
+  - [x] `POST /issues/saz` — SAZ standalone o vinculado a ZNRX (`znrx_key` opcional)
+  - [x] MCP tool `create_saz_request` (lead) — text + znrx_key opcional
+  - [x] `JIRA_SAZ_PROJECT_KEY=SAZ` en `.env.example`
+  - [x] Prompt SAZ especializado en lenguaje DevOps/Release
 - [x] Fase 4.2 — Deuda técnica: JQL injection, audit MCP, rate limiter compartido, 52 unit tests
 - [x] Fase 4.3 — Transiciones y log work: `POST /issues/{key}/transition` + `POST /issues/{key}/worklog`
 - [x] Docker — build + e2e 8/8 service + 10/10 MCP (cert DER→PEM, puertos 18000/18001, JIRA_TIMEOUT=30)

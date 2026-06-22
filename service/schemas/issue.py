@@ -192,3 +192,21 @@ class ActionsResponse(BaseModel):
     key: str
     action: str
     labels: list[str]
+
+
+class CreateSAZRequest(BaseModel):
+    text: str = Field(..., min_length=5, max_length=2000, example="solicitar reinicio del servicio de autenticación en producción")
+    znrx_key: Optional[str] = Field(None, example="ZNRX-68126")
+
+
+class SAZIssuePayload(BaseModel):
+    summary: str = Field(..., max_length=255)
+    description: str
+    issue_type: str = Field(..., pattern="^(Support|Incident|Nueva Iniciativa)$")
+
+
+class CreateSAZResponse(BaseModel):
+    saz_key: str
+    znrx_key: Optional[str] = None
+    summary: str
+    status: str

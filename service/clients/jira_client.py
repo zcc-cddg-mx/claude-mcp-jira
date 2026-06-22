@@ -4,11 +4,12 @@ from typing import Optional
 
 import requests
 
-from ..schemas import IssueResult, JiraIssuePayload, LogWorkPayload, TransitionPayload, UpdateIssuePayload
+from ..schemas import IssueResult, JiraIssuePayload, LogWorkPayload, SAZIssuePayload, TransitionPayload, UpdateIssuePayload
 
 _JIRA_URL = os.environ.get("JIRA_URL", "").rstrip("/")
 _JIRA_PAT = os.environ.get("JIRA_PAT", "")
 _JIRA_PROJECT_KEY = os.environ.get("JIRA_PROJECT_KEY", "")
+_JIRA_SAZ_PROJECT_KEY = os.environ.get("JIRA_SAZ_PROJECT_KEY", "SAZ")
 _CA_BUNDLE = os.environ.get("REQUESTS_CA_BUNDLE", True)
 _TIMEOUT = int(os.environ.get("JIRA_TIMEOUT", "10"))
 
@@ -220,6 +221,23 @@ def get_labels(key: str) -> list[str]:
 
 def update_labels(key: str, labels: list[str]) -> None:
     _put(f"/rest/api/2/issue/{key}", {"fields": {"labels": labels}})
+
+
+def create_saz_issue(payload: SAZIssuePayload, znrx_key: Optional[str] = None) -> str:
+    fields: dict = {
+        "project": {"key": _JIRA_SAZ_PROJECT_KEY},
+        "summary": payload.summary,
+        "description": payload.description,
+        "issuetype": {"name": payload.issue_type},
+    }
+    saz_key = _post("/rest/api/2/issue", {"fields": fields})["key"]
+    if znrx_key:
+        _post_noret("/rest/api/2/issueLink", {
+            "type": {"name": "Relates"},
+            "outwardIssue": {"key": saz_key},
+            "inwardIssue": {"key": znrx_key},
+        })
+    return saz_key
 
 
 def search_issues(jql: str, max_results: int) -> list[IssueResult]:

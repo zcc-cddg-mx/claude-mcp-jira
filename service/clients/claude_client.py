@@ -5,7 +5,7 @@ from pathlib import Path
 from anthropic import Anthropic
 
 from .sanitizer import sanitize
-from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LinkIssuePayload, LogWorkPayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
+from ..schemas import AddCommentPayload, AssignIssuePayload, CloneIssuePayload, JiraIssuePayload, LabelsPayload, LinkIssuePayload, LogWorkPayload, SAZIssuePayload, SearchQueryStruct, SetPriorityPayload, TransitionPayload, UpdateIssuePayload
 
 _client = Anthropic()
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -146,6 +146,13 @@ def parse_labels(user_input: str, current_labels: list[str]) -> LabelsPayload:
     )
     raw = _strip_fences(_call(prompt))
     return LabelsPayload(**_parse_json(raw, "labels"))
+
+
+def parse_saz_request(user_input: str) -> SAZIssuePayload:
+    safe_input = sanitize(user_input)
+    prompt = _load_prompt("saz_create").format(user_input=safe_input)
+    raw = _strip_fences(_call(prompt))
+    return SAZIssuePayload(**_parse_json(raw, "saz_create"))
 
 
 def parse_search_query(user_input: str) -> SearchQueryStruct:

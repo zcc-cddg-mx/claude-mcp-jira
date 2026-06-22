@@ -171,6 +171,25 @@ def _make_tools() -> list[Tool]:
                 "required": ["key", "text"],
             },
         ),
+        Tool(
+            name="create_saz_request",
+            description="Create a SAZ ticket (Solicitud Release Zurich) for DevOps/Release team requests: service restarts, deployments, Git repo management, infrastructure access, environment promotions. Optionally link to a ZNRX ticket.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Natural language description of the DevOps/Release request",
+                        "maxLength": max_len,
+                    },
+                    "znrx_key": {
+                        "type": "string",
+                        "description": "Optional ZNRX issue key to link the SAZ to (e.g. ZNRX-68126)",
+                    },
+                },
+                "required": ["text"],
+            },
+        ),
     ]
 
 
@@ -230,6 +249,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.add_comment(arguments["key"], arguments["text"], user)
         elif name == "link_jira_issues":
             result = service_client.link_issues(arguments["key"], arguments["text"], user)
+        elif name == "create_saz_request":
+            result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user)
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception as e:

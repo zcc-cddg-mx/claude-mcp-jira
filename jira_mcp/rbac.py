@@ -3,8 +3,8 @@ from typing import Optional
 
 ROLES: dict[str, list[str]] = {
     "dev":    ["create_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "link_jira_issues"],
-    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues"],
-    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues"],
+    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request"],
+    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request"],
 }
 
 # Map API key → role. Format: "key1:role1,key2:role2"

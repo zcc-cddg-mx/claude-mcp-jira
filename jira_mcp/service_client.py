@@ -81,6 +81,21 @@ def link_issues(key: str, text: str, user: str) -> dict:
         return {"source_key": d["source_key"], "target_key": d["target_key"], "status": "linked"}
 
 
+def create_saz(text: str, znrx_key, user: str) -> dict:
+    body = {"text": text}
+    if znrx_key:
+        body["znrx_key"] = znrx_key
+    with _client(user) as c:
+        r = c.post("/issues/saz", json=body)
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "saz_key", endpoint="POST /issues/saz")
+        result = {"saz_key": d["saz_key"], "status": d.get("status", "created")}
+        if d.get("znrx_key"):
+            result["znrx_key"] = d["znrx_key"]
+        return result
+
+
 def search_issues(query: str, user: str) -> dict:
     with _client(user) as c:
         r = c.post("/issues/search", json={"query": query})

@@ -7,11 +7,11 @@
 
 ## Resumen de lagunas
 
-| # | Laguna | Archivo | Impacto | Urgencia |
+| # | Laguna | Archivo | Impacto | Estado |
 |---|---|---|---|---|
-| 1 | `clone_issue()` usa constantes hardcodeadas pre-Fase 7 | `jira_client.py` | Bug funcional — clone de ticket no-ZNRX crea en ZNRX con constraints incorrectas | **✅ Resuelto** |
-| 2 | Endpoints de acción no llaman `_project_from_key()` | `jira_client.py` | Solo relevante si el proyecto tiene constraints distintas al default | Baja |
-| 3 | MCP `update_jira_issue` no expone `project` en inputSchema | `jira_mcp/server.py` | `_project_from_key()` ya lo infiere del key; sin impacto funcional real | Muy baja |
+| 1 | `clone_issue()` usa constantes hardcodeadas pre-Fase 7 | `jira_client.py` | Bug funcional — clone de ticket no-ZNRX crea en ZNRX con constraints incorrectas | ✅ Resuelto |
+| 2 | Endpoints de acción no llaman `_project_from_key()` | `jira_client.py` | Solo relevante si el proyecto tiene constraints distintas al default | ✅ No requiere fix |
+| 3 | MCP `update_jira_issue` no expone `project` en inputSchema | `jira_mcp/server.py` | `_project_from_key()` ya lo infiere del key; sin impacto funcional real | ✅ No requiere fix |
 
 ---
 

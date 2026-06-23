@@ -1,7 +1,8 @@
 # TODO — claude-mcp-jira
 
 Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 11 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+19 e2e + 96 unit.
-Próximo: tests live de Fase 11 con code-agent-mcp corriendo; luego Fase 8 UI si hay demanda no-técnica validada.
+Próximo: Fase 10 Orchestrator formal (WorkflowEngine + WorkflowExecution state) — prerequisito para UI y worklogs integrados.
+Evaluación externa: `arch/evaluations/eval-workflow-copilot.md` — arquitectura validada como "Internal Developer Copilot Platform"; orquestación implícita detectada como deuda crítica antes de escalar.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -32,32 +33,41 @@ Actualizar este archivo al completar o añadir tareas.
   - Ejecutar `bash scripts/test-code-agent.sh --live` con `CODE_AGENT_URL` apuntando a una instancia del agente
   - Verificar flujo completo: `run_code_agent` → `get_code_agent_status` → `create_azure_pull_request` → `get_pull_request_status`
 
-- [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
-  - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4
+- [ ] **Fase 10 — Workflow Orchestrator** *(siguiente prioridad — prerequisito para UI y worklogs integrados)*
+  - Evaluación: `arch/evaluations/eval-workflow-copilot.md` — orquestación implícita detectada como deuda crítica
+  - **Por qué ahora**: el flujo Jira→git→PR ya existe disperso en MCP + service layer + "scripts mentales"; formalizarlo antes de añadir UI evita acoplamiento y debugging infernal
+  - **Módulo nuevo**: `service/orchestrator/` con `workflows.py`, `engine.py`, `state.py`
+  - **Entidad clave**: `WorkflowExecution { id, ticket, status, steps: [...] }` — estado de negocio explícito (no solo `task_status` técnico)
+  - **Workflow principal a implementar**: `CreateFeaturePRWorkflow`:
+    1. `create_jira_issue` → ZNRX-XXXXX
+    2. `run_code_agent` → task_id (202)
+    3. `wait_until_done(task_id)` → {branch, aux_branch, commit_id}
+    4. `create_azure_pull_request` → {action, pr_id, pr_url}
+    5. `wait_ci(pr_id)` → build verde
+    6. `update_jira` → link PR + transición "In Review"
+    7. `suggest_worklogs` → preview editable (Fase 9.5b)
+  - **Problema resuelto**: MCP solo decide y llama tools; NO coordina workflows completos directamente
+  - **Naming automático**: rama siempre `feature/ZNRX-123-descripcion` + linking PR→Jira automático
+  - **Prerequisito para**: Fase 8 UI (que mostrará progreso por paso) y Fase 9.5b (worklogs post-PR)
+
+- [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — después de Fase 10 Orchestrator; también requiere demanda no-técnica validada)*
+  - Evaluación: `arch/evaluations/eval-workflow-copilot.md` sección 5 y `arch/evaluations/eval-orchestrator-copilot.md`
   - **Decisión previa**: ¿hay usuarios no-técnicos que necesiten esto? Sin esa respuesta, no construir
+  - UI muestra progreso por paso del WorkflowExecution: 🟡 Creando ticket → 🟡 Ejecutando agent → 🟢 Build OK → ✅ COMPLETADO
   - Fase 1 UI (quick win): registro de horas desde Git con preview editable + factores humanos (checkbox debugging/meetings)
-  - Fase 2 UI: gestión de tickets Jira desde formulario (crear, actualizar, transición)
-  - Fase 3 UI: PR automation (trigger manual → branch → push → PR en Azure DevOps/GitHub)
-  - Fase 4 UI: Orchestrator completo (workflows configurables Git+Jira+PR+SAZ en un flujo)
+  - Fase 2 UI: trigger de workflows (seleccionar proyecto + repo + feature → ejecutar todo)
   - Stack recomendado: Streamlit MVP → Next.js si hay adopción; login PAT → JWT (PAT nunca al frontend)
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
-  - **No construir Orchestrator Service antes de validar adopción** — riesgo de plataforma sin usuarios
-
-- [ ] **Fase 10 — Orchestrator Service** *(futura — solo después de Fase 8 con adopción real)*
-  - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → sección 4 y 11
-  - Nuevo servicio que coordina: Git Service + Jira Service (actual) + PR Service (code-agent) + Worklog Service
-  - Sin este servicio, flujos complejos (crear rama + ticket + PR + SAZ + worklog) son secuencias manuales
-  - **Prerequisito**: Fase 8 UI con adopción validada + Fase 11 Azure PR funcional
-  - Credenciales: por ahora `.env`; si escala → vault o DB cifrada (no construir vault antes de tener el problema)
 
 ---
 
 ## Futuros cambios (sin fecha — activar cuando el volumen lo justifique)
 
-- **Fase 9.5b — Human factors + learning layer** *(después de Fase 8 UI)*
+- **Fase 9.5b — Human factors + learning layer** *(después de Fase 10 Orchestrator + Fase 8 UI)*
   - Factores multiplicadores interactivos: debugging (+30%), meetings (+15%), investigación (+25%) — requieren checkbox en UI
   - Learning layer por usuario: `user_factor = avg(user_input / system_estimate)` persistido en SQLite; ajusta estimación futura automáticamente
-  - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` estrategias 2.2 y 2.4
+  - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` estrategias 2.2 y 2.4 + `arch/evaluations/eval-workflow-copilot.md` sección 6
+  - Integración natural: paso 7 del `CreateFeaturePRWorkflow` → `suggest_worklogs` → preview editable → `register_worklog()`
   - **No implementar** sin UI — los checkboxes sin interfaz gráfica no tienen UX viable
 
 - **Fase 6 — Observabilidad**

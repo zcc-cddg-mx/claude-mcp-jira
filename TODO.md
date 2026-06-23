@@ -1,7 +1,7 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit.
-Próximo accionable sin UI: Fase 9.5a (Claude humanizer). Decisión estratégica previa a UI: validar demanda no-técnica en el equipo.
+Estado general: Fases 1–5, 7, 9.1–9.4, 9.5a completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit.
+Próximo: Fase 8a (PAT dinámico, prerequisito de UI) o decisión de equipo sobre JIRA_ALLOWED_PROJECTS.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -28,13 +28,12 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
-- [ ] **Fase 9.5a — Claude humanizer de estimación** *(accionable sin UI — mejora concreta)*
-  - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` (estrategia 2.5)
-  - El analyzer hoy solo usa span temporal + LOC nudge; Claude puede interpretar semánticamente los mensajes
-  - Nuevo prompt en `service/prompts/git_humanizer.txt`: recibe mensajes de commit + archivos cambiados + hora del día → devuelve `adjusted_hours + reason`
-  - Integrar en `git_sync.py` como paso post-analyzer (antes del dry_run): si Claude ajusta, se reporta en `GitSessionResult` con campo `humanizer_reason`
-  - `dry_run=true` ya existe → el preview sigue siendo el human-in-the-loop suficiente por ahora
-  - **No implementar** learning layer ni factores multiplicadores hasta tener UI
+- [x] **Fase 9.5a — Claude humanizer de estimación** *(completado 2026-06-23)*
+  - `service/prompts/git_humanizer.txt` — prompt conservador con señales: debugging keywords, high churn, late-night work
+  - `service/clients/claude_client.py` → `parse_git_humanizer(session)` — devuelve `{adjusted_hours, reason}`; falla silenciosamente
+  - `GitSessionResult` — campos `base_estimated_hours` (solo cuando hay ajuste) + `humanizer_reason`
+  - `git_sync.py` — paso post-analyzer; usa `final_seconds` para worklog; flag `GIT_HUMANIZER=true`
+  - `.env.example` — documentada variable `GIT_HUMANIZER`
 
 - [ ] **Fase 8a — PAT dinámico por usuario** *(prerequisito de Fase 8 UI)*
   - `X-Jira-Token` header opcional en service layer — sobreescribe `JIRA_PAT` del `.env`

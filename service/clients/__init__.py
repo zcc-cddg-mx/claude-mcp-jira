@@ -1,4 +1,5 @@
 from .claude_client import (
+    parse_git_humanizer,
     parse_git_sync_fallback,
     parse_add_comment,
     parse_assign_issue,
@@ -39,6 +40,7 @@ from .rate_limiter import check as rate_limit_check
 from .sanitizer import sanitize
 
 __all__ = [
+    "parse_git_humanizer",
     "parse_git_sync_fallback",
     "add_comment",
     "assign_issue",

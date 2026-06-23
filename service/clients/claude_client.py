@@ -160,6 +160,34 @@ def parse_saz_request(user_input: str) -> SAZIssuePayload:
     return SAZIssuePayload(**_parse_json(raw, "saz_create"))
 
 
+def parse_git_humanizer(session: dict) -> dict:
+    """Ask Claude to review the algorithmic time estimate for a session and suggest a
+    human-aware adjustment. Returns {adjusted_hours: float, reason: str}.
+    Only commit metadata is sent — no code content."""
+    messages = session.get("messages", [])
+    commit_messages_str = "\n".join(f"- {sanitize(m)}" for m in messages[:20])
+    base_hours = round(session.get("estimated_seconds", 900) / 3600, 2)
+    commits = session.get("commits", [])
+    hour_of_day = commits[0]["timestamp"].hour if commits else 9
+    prompt = _load_prompt("git_humanizer").format(
+        commit_count=len(commits),
+        commit_messages=commit_messages_str,
+        total_loc=session.get("total_loc", 0),
+        hour_of_day=hour_of_day,
+        base_hours=base_hours,
+    )
+    raw = _strip_fences(_call(prompt, max_tokens=128))
+    try:
+        data = _parse_json(raw, "git_humanizer")
+        adjusted = float(data.get("adjusted_hours", base_hours))
+        # Clamp to sane range
+        adjusted = max(0.25, min(4.0, round(adjusted * 4) / 4))
+        reason = str(data.get("reason", "")).strip() or "Estimate unchanged."
+        return {"adjusted_hours": adjusted, "reason": reason}
+    except Exception:
+        return {"adjusted_hours": base_hours, "reason": "Estimate unchanged."}
+
+
 def parse_git_sync_fallback(commit_messages: list[str], branch: str | None) -> str | None:
     """Ask Claude to identify a Jira key from commit messages when regex found nothing.
     Returns issue key string or None. Only metadata is sent — no code content."""

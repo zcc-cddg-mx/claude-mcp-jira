@@ -5,6 +5,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from ..audit import log, new_request_id
 from ..clients import log_work, parse_git_sync_fallback, rate_limit_check
+from ..clients.claude_client import parse_git_humanizer
 from ..clients.sanitizer import sanitize
 from ..schemas import GitSessionResult, GitSyncRequest, GitSyncResponse
 from ..schemas.issue import LogWorkPayload
@@ -15,6 +16,7 @@ from ..git.repo_registry import resolve_repo
 _logger = logging.getLogger(__name__)
 
 _GIT_CLAUDE_FALLBACK = os.environ.get("GIT_CLAUDE_FALLBACK", "true").lower() == "true"
+_GIT_HUMANIZER = os.environ.get("GIT_HUMANIZER", "true").lower() == "true"
 
 router = APIRouter(prefix="/git", tags=["git"])
 
@@ -85,15 +87,29 @@ async def git_sync_endpoint(
                 s["issue_key"] = _registry_default_key
                 s["confidence"] = "low"
 
+    # Claude humanizer: adjust time estimates with semantic signals from commit messages
+    if _GIT_HUMANIZER:
+        for s in sessions_raw:
+            try:
+                result = parse_git_humanizer(s)
+                s["humanizer_adjusted_seconds"] = int(result["adjusted_hours"] * 3600)
+                s["humanizer_reason"] = result["reason"]
+            except Exception as e:
+                _logger.warning("git_sync humanizer failed: %s", e)
+                s["humanizer_adjusted_seconds"] = s["estimated_seconds"]
+                s["humanizer_reason"] = None
+
     # Build result sessions and optionally register worklogs
     result_sessions: list[GitSessionResult] = []
     worklogs_registered = 0
 
     for s in sessions_raw:
+        # Use humanizer-adjusted seconds if available, else algorithmic estimate
+        final_seconds = s.get("humanizer_adjusted_seconds", s["estimated_seconds"])
         registered = False
         if not body.dry_run and s["issue_key"]:
             payload = LogWorkPayload(
-                time_spent_seconds=max(60, s["estimated_seconds"]),
+                time_spent_seconds=max(60, final_seconds),
                 comment=_worklog_comment(s),
             )
             try:
@@ -103,15 +119,18 @@ async def git_sync_endpoint(
             except Exception as e:
                 _logger.warning("git_sync: failed to log work on %s: %s", s["issue_key"], e)
 
+        base_secs = s["estimated_seconds"]
         result_sessions.append(GitSessionResult(
             issue_key=s["issue_key"],
-            estimated_hours=round(s["estimated_seconds"] / 3600, 2),
-            estimated_seconds=s["estimated_seconds"],
+            estimated_hours=round(final_seconds / 3600, 2),
+            estimated_seconds=final_seconds,
+            base_estimated_hours=round(base_secs / 3600, 2) if final_seconds != base_secs else None,
             confidence=s["confidence"],
             messages=s["messages"],
             total_loc=s["total_loc"],
             commit_count=len(s["commits"]),
             worklog_registered=registered,
+            humanizer_reason=s.get("humanizer_reason"),
         ))
 
     sessions_with_key = sum(1 for s in result_sessions if s.issue_key)

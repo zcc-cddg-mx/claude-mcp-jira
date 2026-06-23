@@ -36,13 +36,15 @@ class GitRepoListResponse(BaseModel):
 
 class GitSessionResult(BaseModel):
     issue_key: Optional[str] = None
-    estimated_hours: float
-    estimated_seconds: int
+    estimated_hours: float        # final estimate (humanizer-adjusted if enabled)
+    estimated_seconds: int        # final estimate in seconds
+    base_estimated_hours: Optional[float] = None  # algorithmic estimate before humanizer
     confidence: str
     messages: list[str]
     total_loc: int
     commit_count: int
     worklog_registered: bool = False
+    humanizer_reason: Optional[str] = None
 
 
 class GitSyncResponse(BaseModel):

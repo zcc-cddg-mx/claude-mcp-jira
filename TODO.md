@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: test-git.sh (cobertura Git Intelligence) o Fase 8a (PAT dinámico).
+Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 52 unit. Próximo: Fase 8a (PAT dinámico) o unit tests Git Intelligence.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -40,10 +40,10 @@ Actualizar este archivo al completar o añadir tareas.
   - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
 
-- [ ] **Test e2e para Git Intelligence** *(deuda de cobertura)*
-  - `scripts/test-git.sh` no existe — ningún test e2e cubre `POST /git/sync`, `POST/GET/DELETE /git/repos`
-  - Los módulos `scanner.py`, `analyzer.py`, `mapper.py`, `repo_registry.py` tampoco tienen unit tests en `tests/`
-  - Mínimo recomendado: test-git.sh con dry_run sobre este repo + unit tests para `analyzer.py` y `mapper.py`
+- [ ] **Unit tests para módulos Git Intelligence** *(deuda de cobertura — menor)*
+  - `tests/` no tiene unit tests para `analyzer.py` y `mapper.py` (lógica de sesiones y extracción de issue key)
+  - `scanner.py` y `repo_registry.py` dependen de filesystem/subprocess — e2e suficiente para esos
+  - El e2e `scripts/test-git.sh` ya cubre los endpoints; unit tests añadirían cobertura de lógica interna
 
 - [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
   - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
@@ -146,3 +146,6 @@ Actualizar este archivo al completar o añadir tareas.
   - [x] `.env.example` sin variables `GIT_*` — añadida sección `GIT INTELLIGENCE` con los 4 parámetros
   - [x] `jira_mcp/README.md` sin tools Fase 9 — tabla herramientas + RBAC + limitación Docker actualizadas
   - [x] Limitación Docker `git sync` documentada en `jira_mcp/README.md`
+- [x] `scripts/test-git.sh` — 26/26 e2e Git Intelligence (2026-06-23):
+  - CRUD `/git/repos`: register, list, get, 404, upsert, delete, 404-post-delete
+  - `/git/sync`: dry_run por repo_path, por repo_name, error 404 alias inválido, error 422 path relativo

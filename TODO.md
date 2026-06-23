@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 52 unit. Próximo: Fase 8a (PAT dinámico) o unit tests Git Intelligence.
+Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit. Próximo: Fase 8a (PAT dinámico) o decisión JIRA_ALLOWED_PROJECTS.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -40,10 +40,6 @@ Actualizar este archivo al completar o añadir tareas.
   - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
 
-- [ ] **Unit tests para módulos Git Intelligence** *(deuda de cobertura — menor)*
-  - `tests/` no tiene unit tests para `analyzer.py` y `mapper.py` (lógica de sesiones y extracción de issue key)
-  - `scanner.py` y `repo_registry.py` dependen de filesystem/subprocess — e2e suficiente para esos
-  - El e2e `scripts/test-git.sh` ya cubre los endpoints; unit tests añadirían cobertura de lógica interna
 
 - [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
   - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
@@ -149,3 +145,6 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] `scripts/test-git.sh` — 26/26 e2e Git Intelligence (2026-06-23):
   - CRUD `/git/repos`: register, list, get, 404, upsert, delete, 404-post-delete
   - `/git/sync`: dry_run por repo_path, por repo_name, error 404 alias inválido, error 422 path relativo
+- [x] Unit tests `analyzer.py` + `mapper.py` — 37 tests (2026-06-23): suite total 89 unit tests
+  - `test_git_mapper.py`: 15 tests — message key, branch fallback, precedencia, límites de patrón
+  - `test_git_analyzer.py`: 22 tests — sesiones, gap, ordenación, issue key, confidence, LOC, estimación

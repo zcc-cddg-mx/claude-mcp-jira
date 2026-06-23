@@ -28,20 +28,6 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
-- [x] **Fase 9.5a — Claude humanizer de estimación** *(completado 2026-06-23)*
-  - `service/prompts/git_humanizer.txt` — prompt conservador con señales: debugging keywords, high churn, late-night work
-  - `service/clients/claude_client.py` → `parse_git_humanizer(session)` — devuelve `{adjusted_hours, reason}`; falla silenciosamente
-  - `GitSessionResult` — campos `base_estimated_hours` (solo cuando hay ajuste) + `humanizer_reason`
-  - `git_sync.py` — paso post-analyzer; usa `final_seconds` para worklog; flag `GIT_HUMANIZER=true`
-  - `.env.example` — documentada variable `GIT_HUMANIZER`
-
-- [x] **Fase 8a — PAT dinámico por usuario** *(completado 2026-06-23)*
-  - `ContextVar _request_pat` en `jira_client.py` + `JiraAuthMiddleware` (BaseHTTPMiddleware) en `service/middleware/jira_auth.py`
-  - `X-Jira-Token` header sobreescribe `JIRA_PAT` env; sin header → cuenta de servicio (sin ruptura)
-  - `audit.py` registra `pat_source: "header" | "env"` — token nunca logueado
-  - MCP: `jira_token` parámetro opcional en los 9 tools; `service_client.py` lo propaga a `_client()`
-  - Tests unitarios: `tests/test_jira_pat_routing.py` (7 tests: default, override, reset, aislamiento async, None, vacío, no-log)
-
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4
   - **Decisión previa**: ¿hay usuarios no-técnicos que necesiten esto? Sin esa respuesta, no construir
@@ -57,7 +43,7 @@ Actualizar este archivo al completar o añadir tareas.
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → sección 4 y 11
   - Nuevo servicio que coordina: Git Service + Jira Service (actual) + PR Service + Worklog Service
   - Sin este servicio, flujos complejos (crear rama + ticket + PR + SAZ + worklog) son secuencias manuales
-  - **Prerequisito**: Fase 8 UI con adopción validada + Fase 8a PAT dinámico
+  - **Prerequisito**: Fase 8 UI con adopción validada (Fase 8a ya completa)
   - Credenciales: por ahora `.env`; si escala → vault o DB cifrada (no construir vault antes de tener el problema)
 
 ---
@@ -166,3 +152,16 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Unit tests `analyzer.py` + `mapper.py` — 37 tests (2026-06-23): suite total 89 unit tests
   - `test_git_mapper.py`: 15 tests — message key, branch fallback, precedencia, límites de patrón
   - `test_git_analyzer.py`: 22 tests — sesiones, gap, ordenación, issue key, confidence, LOC, estimación
+- [x] Fase 9.5a — Claude humanizer de estimación (2026-06-23):
+  - `service/prompts/git_humanizer.txt` — señales: debugging keywords, high churn (LOC>400), late-night (20-23/0-5)
+  - `parse_git_humanizer(session)` en `claude_client.py` — clamp 0.25–4.0h, redondeo 0.25h, falla silenciosamente al base
+  - `GitSessionResult` — `base_estimated_hours` (solo cuando hay ajuste) + `humanizer_reason`
+  - `git_sync.py` — paso post-analyzer; flag `GIT_HUMANIZER=true` en `.env.example`
+- [x] Fase 8a — PAT dinámico por usuario vía `X-Jira-Token` (2026-06-23):
+  - `service/clients/jira_client.py` — `ContextVar _request_pat` + `_get_headers()`; fallback a `JIRA_PAT` env
+  - `service/middleware/jira_auth.py` — `JiraAuthMiddleware` extrae header, inyecta ContextVar con `try/finally`
+  - `service/audit.py` — `pat_source: "header" | "env"` en cada entrada; token nunca logueado
+  - `service/main.py` — middleware registrado; versión `0.5.0`
+  - `jira_mcp/service_client.py` — `jira_token` opcional en todas las funciones; `_client(user, jira_token)`
+  - `jira_mcp/server.py` — `jira_token` propiedad opcional en los 9 tools MCP; dispatch propaga
+  - `tests/test_jira_pat_routing.py` — 7 tests; suite total 96 unit tests

@@ -16,6 +16,7 @@ Three-layer design — CLI and MCP server never call Claude or Jira directly:
 [CLI (Typer)]     ──HTTP──►
                             [Service Layer (FastAPI)] → [Claude API (LiteLLM proxy)]
 [MCP Server SSE]  ──HTTP──►                           → [Jira REST API v2 — jira.zurich.com]
+                                                       → [code-agent-mcp (Fase 11) — git + Azure PR]
 ```
 
 **Key constraints for Zurich environment:**
@@ -23,13 +24,14 @@ Three-layer design — CLI and MCP server never call Claude or Jira directly:
 - Claude API goes through the internal LiteLLM proxy (see parent repo `CLAUDE.md` for env vars)
 - Corporate firewall requires `REQUESTS_CA_BUNDLE` pointing to `certs/` for Jira calls
 - No external services (Atlassian MCP cloud, N8N, Zapier) — all traffic stays inside the network
+- `code-agent-mcp` is a separate service (`/home/idavid/dev/claude/code-agent-mcp`) — handles git ops and Azure DevOps PRs; auth via `X-Agent-Token`
 
 ## Setup
 
 ```bash
 conda env create -f environment.yml
 conda activate claude-mcp-jira
-cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY and uncomment REQUESTS_CA_BUNDLE
+cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY, CODE_AGENT_TOKEN and uncomment REQUESTS_CA_BUNDLE
 ```
 
 ## Running
@@ -45,11 +47,14 @@ bash scripts/dev.sh restart    # reinicio limpio
 bash scripts/dev.sh status     # ver estado
 
 # Tests
-bash scripts/test-dev.sh       # e2e service layer: 8 tests (CLI → FastAPI → Jira)
-bash scripts/test-mcp.sh       # e2e MCP server: 10 tests (tools + auth + RBAC)
-bash scripts/test-multi.sh     # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
-bash scripts/test-actions.sh   # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
-pytest tests/                  # tests unitarios: 52 tests (sanitizer, jql, auth, rbac)
+bash scripts/test-dev.sh          # e2e service layer: 8 tests (CLI → FastAPI → Jira)
+bash scripts/test-mcp.sh          # e2e MCP server: 10 tests (tools + auth + RBAC)
+bash scripts/test-multi.sh        # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
+bash scripts/test-actions.sh      # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
+bash scripts/test-git.sh          # e2e Git Intelligence: 26 tests (repos CRUD + sync dry_run)
+bash scripts/test-code-agent.sh   # Fase 11 schema/dispatch: 19 tests (sin requerir code-agent-mcp corriendo)
+bash scripts/test-code-agent.sh --live  # live e2e con code-agent-mcp en CODE_AGENT_URL
+pytest tests/                     # tests unitarios: 96 tests (sanitizer, jql, auth, rbac, git_analyzer, git_mapper, jira_pat_routing)
 
 # CLI commands
 python cli/main.py create "bug login en producción prioridad alta"
@@ -112,6 +117,13 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `assign_jira_issue` | lead | Asigna un ticket a un usuario |
 | `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
 | `create_saz_request` | lead | Crea ticket SAZ (DevOps/Release); `znrx_key` opcional |
+| `sync_git_worklogs` | dev | Lee repo Git local, detecta sesiones de trabajo y registra worklogs en Jira |
+| `register_git_repo` | dev | Registra un repo local en el registry (alias → ruta + proyecto Jira) |
+| `list_git_repos` | dev | Lista repos registrados en el registry |
+| `run_code_agent` | lead | Encola tarea git en code-agent-mcp: crear rama, commit, push, rama auxiliar → `task_id` |
+| `get_code_agent_status` | dev | Consulta estado de tarea code-agent-mcp (queued/running/done/error) |
+| `create_azure_pull_request` | lead | Idempotente: ensure aux branch + crear o retornar PR en Azure DevOps |
+| `get_pull_request_status` | dev | Estado del PR + build CI en Azure DevOps |
 
 ## Security layers
 
@@ -129,6 +141,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | Output normalizado | MCP server | LLM solo recibe `{key,status}` o `{key,summary}` |
 | SSE timeout | MCP server | `asyncio.wait_for` con `MCP_SSE_TIMEOUT=300s` |
 | Tests unitarios | `tests/` | 96 tests: sanitizer, jql_builder, auth, rbac, git_analyzer, git_mapper, jira_pat_routing |
+| code-agent-mcp token | MCP server | `X-Agent-Token` en `_agent_client()` — separado del `JIRA_PAT`; valor en `CODE_AGENT_TOKEN` |
 
 ## Jira Auth (Server/DC)
 
@@ -151,6 +164,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Plan de implementación | `arch/design/implementation-plan.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
 | MCP server config | `jira_mcp/README.md` |
+| Integración code-agent-mcp (Fase 11) | `arch/code-agent/integration-plan.md` |
 | Proyectos Jira (restricciones, TICKET_LANG) | `docs/jira-projects.md` |
 | Campos requeridos por proyecto | `docs/jira-fields.md` |
 | Permisos efectivos del usuario | `docs/jira-roles.md` |
@@ -180,7 +194,9 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 8a — PAT dinámico | ✅ Completa | `X-Jira-Token` header opcional — `ContextVar` + `JiraAuthMiddleware`; `jira_token` en todos los MCP tools; `pat_source` en audit log |
 | 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
 | 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, `POST /git/sync`, repo registry SQLite (`git_repos`), MCP `sync_git_worklogs`/`register_git_repo`/`list_git_repos` |
-| 9.5 — Human-sensity worklogs | Futura | Señales contextuales (tipo archivo, hora del día, densidad commits) + preview editable human-in-the-loop antes de registrar |
+| 9.5a — Claude humanizer | ✅ Completa | Ajuste semántico de estimaciones git con Claude (debugging, alta complejidad, trabajo nocturno) |
+| 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere UI |
+| 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
 
 ## Test tickets (limpieza)
 

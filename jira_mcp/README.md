@@ -5,6 +5,8 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 
 ## Herramientas disponibles
 
+### Jira
+
 | Herramienta | Rol mínimo | Descripción |
 |---|---|---|
 | `create_jira_issue` | dev | Crea un ticket desde texto libre; `project` opcional |
@@ -16,9 +18,35 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 | `assign_jira_issue` | lead | Asigna un ticket a un usuario |
 | `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
 | `create_saz_request` | lead | Crea ticket SAZ (DevOps/Release); `znrx_key` opcional |
+
+### Git Intelligence (Fase 9)
+
+| Herramienta | Rol mínimo | Descripción |
+|---|---|---|
 | `sync_git_worklogs` | dev | Lee repo Git local, detecta sesiones de trabajo vinculadas a tickets y registra worklogs. Acepta `repo_name` (alias), `repo_path` (ruta absoluta), o usa el repo default. `dry_run=true` por defecto. |
 | `register_git_repo` | dev | Registra un repo local en el registry: alias → ruta + proyecto Jira + ticket default |
 | `list_git_repos` | dev | Lista los repos registrados en el registry (alias, ruta, proyecto, ticket default) |
+
+### Azure DevOps / code-agent-mcp (Fase 11)
+
+| Herramienta | Rol mínimo | Descripción |
+|---|---|---|
+| `run_code_agent` | lead | Encola tarea git en code-agent-mcp: crear rama feature, commit de archivos, push y rama auxiliar. Retorna `task_id` inmediatamente (202). |
+| `get_code_agent_status` | dev | Consulta estado de la tarea (queued/running/done/error). En `done` incluye `branch`, `aux_branch`, `commit_id`. |
+| `create_azure_pull_request` | lead | Idempotente: asegura que la rama auxiliar existe/está al día y crea (o devuelve el existente) el PR en Azure DevOps. Retorna `action` (created/updated/unchanged), `pr_id`, `pr_url`. |
+| `get_pull_request_status` | dev | Estado del PR (`active/completed/abandoned`) + build CI (`pending/succeeded/failed/unknown`). |
+
+**Flujo orquestado desde Claude Code:**
+```
+1. create_jira_issue       → ZNRX-XXXXX
+2. run_code_agent          → task_id  (202 inmediato)
+3. get_code_agent_status   → polling → done → {branch, aux_branch, commit_id}
+4. create_azure_pull_request → {action, pr_id, pr_url}  (idempotente)
+5. get_pull_request_status → esperar build verde
+6. update_jira_issue       → link PR + transición "In Review"
+```
+
+**Requisito**: `code-agent-mcp` corriendo en `CODE_AGENT_URL` (default `http://code-agent-mcp:5001`). Ver `arch/code-agent/integration-plan.md`.
 
 ## Seguridad
 
@@ -87,13 +115,16 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 | `MCP_SERVICE_TIMEOUT` | `30` | Timeout hacia el service layer (segundos) |
 | `JIRA_MAX_RESULTS` | `50` | Máximo de resultados en búsquedas (hard cap: 50) |
 | `TICKET_LANG` | `es` | Idioma del contenido generado: `es` \| `en` (ver `docs/jira-projects.md`) |
+| `CODE_AGENT_URL` | `http://code-agent-mcp:5001` | URL del code-agent-mcp (Fase 11) |
+| `CODE_AGENT_TOKEN` | `` | Token de auth para code-agent-mcp (`X-Agent-Token`); mismo valor que `TOKEN_AZURE` en ese servicio |
+| `CODE_AGENT_TIMEOUT` | `30` | Timeout para llamadas al code-agent-mcp (segundos) |
 
 ## RBAC — permisos por rol
 
 | Rol | Herramientas permitidas |
 |---|---|
-| `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos` |
-| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos` |
+| `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `get_code_agent_status`, `get_pull_request_status` |
+| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `run_code_agent`, `get_code_agent_status`, `create_azure_pull_request`, `get_pull_request_status` |
 | `system` | todas |
 
 Ejemplo de configuración con múltiples claves:

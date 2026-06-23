@@ -1,7 +1,7 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 96 unit.
-Próximo: Azure PR en el code-agent (ov-suscripcion-automation); luego conectar desde aquí vía MCP tool.
+Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 11 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+19 e2e + 96 unit.
+Próximo: tests live de Fase 11 con code-agent-mcp corriendo; luego Fase 8 UI si hay demanda no-técnica validada.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -28,15 +28,9 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
-- [ ] **Fase 11 — Integración con `code-agent-mcp`** *(siguiente — agente ya funcional, pendiente conectar aquí)*
-  - **`code-agent-mcp`** (`/home/idavid/dev/claude/code-agent-mcp`) — 73 tests, probado e2e contra Azure DevOps (PRs #2552–#2554)
-  - Capacidades disponibles: registro de repos/proyectos, roles de ramas, tareas async (202+polling), ensure aux branch idempotente, PR via `POST /azure/prepare-and-pr`
-  - **Pendiente en este repo:**
-    - `service/clients/code_agent_client.py` — client HTTP: `run_task`, `get_task_status`, `prepare_and_pr`, `get_pr_status`
-    - Variables de entorno: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`
-    - 4 MCP tools: `run_code_agent` (lead), `get_code_agent_status` (dev), `create_azure_pull_request` (lead), `get_pull_request_status` (dev)
-    - `scripts/test-code-agent.sh` — e2e del flujo completo
-  - Ver diseño completo: `arch/code-agent/integration-plan.md`
+- [ ] **Tests live Fase 11** *(bajo — requiere code-agent-mcp corriendo)*
+  - Ejecutar `bash scripts/test-code-agent.sh --live` con `CODE_AGENT_URL` apuntando a una instancia del agente
+  - Verificar flujo completo: `run_code_agent` → `get_code_agent_status` → `create_azure_pull_request` → `get_pull_request_status`
 
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4
@@ -167,6 +161,13 @@ Actualizar este archivo al completar o añadir tareas.
   - `parse_git_humanizer(session)` en `claude_client.py` — clamp 0.25–4.0h, redondeo 0.25h, falla silenciosamente al base
   - `GitSessionResult` — `base_estimated_hours` (solo cuando hay ajuste) + `humanizer_reason`
   - `git_sync.py` — paso post-analyzer; flag `GIT_HUMANIZER=true` en `.env.example`
+- [x] Fase 11 — Integración code-agent-mcp (2026-06-23):
+  - `service/clients/code_agent_client.py` — cliente httpx: `run_task`, `get_task_status`, `prepare_and_pr`, `get_pr_status`; auth `X-Agent-Token`
+  - `jira_mcp/service_client.py` — 4 funciones: `run_code_agent`, `get_code_agent_status`, `create_azure_pull_request`, `get_pull_request_status`; `_agent_client()` independiente del `_client()` Jira
+  - `jira_mcp/server.py` — 4 tools MCP con schema completo + dispatch; lead: `run_code_agent`, `create_azure_pull_request`; dev: status tools
+  - `scripts/test-code-agent.sh` — 19/19 tests (schema, dispatch, funciones, env vars)
+  - `.env.example` — sección `CODE AGENT MCP`: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`, `CODE_AGENT_TIMEOUT`
+  - `code-agent-mcp` ya funcional (73 tests, PRs #2552-2554 reales); claude-mcp-jira ahora orquesta flujo completo Jira → git → PR Azure
 - [x] Fase 8a — PAT dinámico por usuario vía `X-Jira-Token` (2026-06-23):
   - `service/clients/jira_client.py` — `ContextVar _request_pat` + `_get_headers()`; fallback a `JIRA_PAT` env
   - `service/middleware/jira_auth.py` — `JiraAuthMiddleware` extrae header, inyecta ContextVar con `try/finally`

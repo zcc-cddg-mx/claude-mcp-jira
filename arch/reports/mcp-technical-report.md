@@ -2,7 +2,7 @@
 
 **Proyecto**: claude-mcp-jira  
 **Propósito**: referencia técnica para evaluaciones, auditorías y decisiones de arquitectura futuras  
-**Fecha**: Junio 2026 — actualizado post-Fase 7b
+**Fecha**: Junio 2026 — actualizado post-Fase 9.4 (Git Intelligence completa)
 
 ---
 
@@ -232,6 +232,9 @@ Problemas:
 | `assign_jira_issue` | lead | `POST /issues/{key}/assign` | Asigna un responsable |
 | `set_priority_jira_issue` | lead | `POST /issues/{key}/priority` | Cambia la prioridad |
 | `create_saz_request` | lead | `POST /issues/saz` | Crea ticket SAZ; `znrx_key` opcional |
+| `sync_git_worklogs` | dev | `POST /git/sync` | Lee repo Git local, detecta sesiones y registra worklogs. `dry_run=true` por defecto. Acepta `repo_name` o `repo_path`. |
+| `register_git_repo` | dev | `POST /git/repos` | Registra alias de repo con proyecto y ticket Jira por defecto |
+| `list_git_repos` | dev | `GET /git/repos` | Lista repos registrados en el registry |
 
 ---
 
@@ -315,8 +318,22 @@ El link se crea automáticamente si se provee `znrx_key` en `POST /issues/saz`.
    └── Cualquier proyecto Jira válido se registra en el primer acceso
    └── GET /projects + GET /projects/{key}
 
+⬜ Fase 8a — PAT dinámico (futura)
+   └── X-Jira-Token header opcional — autoría correcta por usuario
+
 ⬜ Fase 8 — UI (futura)
    └── Interfaz web para usuarios no técnicos
+
+✅ Fase 9.1–9.4 — Git Intelligence
+   └── Scanner subprocess (metadata only, nunca código)
+   └── Analyzer: sesiones por gap temporal + estimación LOC nudge
+   └── Mapper: regex en mensaje/rama + Claude NLP fallback
+   └── POST /git/sync (dry_run=true por defecto)
+   └── Repo registry SQLite git_repos: alias → path/origin/default_issue_key
+   └── MCP tools: sync_git_worklogs, register_git_repo, list_git_repos
+
+⬜ Fase 9.5 — Human-sensity worklogs (futura)
+   └── Señales contextuales + preview editable human-in-the-loop
 ```
 
 ---

@@ -505,7 +505,7 @@ Implica añadir `POST /auth/login` y `GET /me` al service layer.
 
 ---
 
-## Fase 9 — Git Intelligence (futura)
+## Fase 9 — Git Intelligence ✅ Completa (9.1–9.4) / Futura (9.5)
 
 > Evaluación basada en `arch/evaluations/eval-git-copilot.md`.
 
@@ -559,79 +559,87 @@ if loc_changed > 200: sesion *= 1.2
 # Input: mensajes de commit + LOC (no el diff completo)
 ```
 
-#### Nuevos componentes
+#### Componentes implementados
 
 ```
 service/
 └── git/
-    ├── scanner.py    — git.Repo(path).iter_commits(since=...)
-    ├── analyzer.py   — group_sessions(), estimate_time()
-    └── mapper.py     — extract_issue_key(), claude_fallback()
+    ├── scanner.py       — subprocess git log (metadata only, nunca código)
+    ├── analyzer.py      — group_sessions(), estimate_time() con LOC nudge
+    ├── mapper.py        — extract_issue_key() regex + Claude fallback
+    └── repo_registry.py — SQLite git_repos: name/alias → path/origin/defaults
+
+service/routes/
+    ├── git_sync.py      — POST /git/sync (repo_name | repo_path | default)
+    └── git_repos.py     — CRUD POST/GET/DELETE /git/repos
+
+service/prompts/
+    └── git_sync_fallback.txt — prompt Claude NLP (mensajes + branch, sin código)
 ```
 
-#### Nueva tool MCP
+#### Tools MCP implementadas
 
-```python
-sync_git_worklogs(
-    repo_path: str,      # path al repo local
-    since_days: int = 1  # días hacia atrás
-)
-```
+| Tool | Rol | Descripción |
+|---|---|---|
+| `sync_git_worklogs` | dev+ | Sincroniza worklogs desde repo. Acepta `repo_name` o `repo_path`. `dry_run=true` por defecto. |
+| `register_git_repo` | dev+ | Registra alias de repo con proyecto y ticket default |
+| `list_git_repos` | dev+ | Lista repos registrados en el registry |
 
-Flujo desde Claude Code:
-```
-User: "registra mis horas de hoy en el repo auth-service"
-Claude → sync_git_worklogs(repo_path="~/repos/auth-service", since_days=1)
-→ Preview con sesiones detectadas → usuario confirma → worklogs registrados
-```
-
-#### Nuevo endpoint service layer
+#### Endpoints service layer implementados
 
 ```http
 POST /git/sync
-{
-  "repo_path": "/home/user/repos/auth-service",
-  "since_days": 1,
-  "dry_run": true
-}
-→ {sessions: [{issue_key, estimated_hours, commits, confidence}]}
+{ "repo_name": "auth-service", "since_days": 1, "dry_run": true }
+→ {sessions: [{issue_key, estimated_hours, commits, confidence, worklog_registered}]}
+
+POST   /git/repos        — registrar/actualizar alias (origin auto-detectado)
+GET    /git/repos        — listar todos
+GET    /git/repos/{name} — obtener uno
+DELETE /git/repos/{name} — eliminar
 ```
 
-Con `dry_run=true` devuelve el preview sin registrar — ideal para la validación human-in-the-loop.
-
-#### Pantalla UI propuesta (si Fase 8 está implementada)
+#### Repo registry — fallback en cascada
 
 ```
-📊 Git Work Summary — auth-service
-
-Sesión 1:  ZNRX-68171  →  2h estimadas  (3 commits)
-Sesión 2:  ZNRX-68183  →  1.5h estimadas (1 commit, rama: feature/ZNRX-68183)
-
-[✅ Confirmar todo]  [✏️ Ajustar]  [❌ Cancelar]
+1. repo_name  → busca por alias en git_repos
+2. repo_path  → busca por path o usa directamente
+3. (ninguno)  → usa repo con is_default=1
+Para sesiones sin key: regex → Claude NLP → default_issue_key del repo (confidence=low)
 ```
 
-#### Implementación incremental recomendada
+#### Variables de entorno
 
-| Sub-fase | Descripción | Esfuerzo |
+| Variable | Default | Descripción |
 |---|---|---|
-| 9.1 | Scanner + mapper (regex + rama) + endpoint `/git/sync` dry_run | 1-2 días |
-| 9.2 | Estimación de tiempo + registro real de worklogs | 1-2 días |
-| 9.3 | MCP tool `sync_git_worklogs` + Claude fallback para commits sin key | 1 día |
-| 9.4 | Integración con Fase 8 UI (preview interactivo) | Opcional |
+| `GIT_SESSION_GAP_MINUTES` | `120` | Minutos de inactividad que separan sesiones |
+| `GIT_MIN_SESSION_MINUTES` | `15` | Mínimo de minutos por sesión |
+| `GIT_MAX_SESSION_MINUTES` | `240` | Máximo de minutos por sesión |
+| `GIT_LOC_NUDGE_THRESHOLD` | `200` | LOC mínimas para aplicar nudge +20% |
+| `GIT_CLAUDE_FALLBACK` | `true` | Activar fallback Claude NLP para commits sin key |
+
+#### Sub-fases
+
+| Sub-fase | Descripción | Estado |
+|---|---|---|
+| 9.1 | Scanner + mapper (regex + rama) + endpoint `/git/sync` dry_run | ✅ Completa |
+| 9.2 | Estimación de tiempo + registro real de worklogs | ✅ Completa |
+| 9.3 | MCP tool `sync_git_worklogs` + Claude fallback | ✅ Completa |
+| 9.4 | Repo registry SQLite + CRUD + MCP tools register/list | ✅ Completa |
+| 9.5 | Human-sensity — señales contextuales + preview editable human-in-the-loop | Futura |
 
 #### Riesgos y mitigaciones
 
 | Riesgo | Mitigación |
 |---|---|
-| Sobreestimación de horas | Preview obligatorio antes de registrar; `dry_run=true` por defecto |
-| Commits sin ticket | Fallback Claude o ignorar (configurable por usuario) |
-| Privacidad del código | Solo metadata a Claude — mensajes, archivos, LOC; nunca el diff |
-| Mono-repo / múltiples proyectos | Mapping dinámico por directorio o rama; configurable en `.env` |
-| Repos en Windows/WSL | `repo_path` como parámetro explícito; no asume CWD |
+| Sobreestimación de horas | `dry_run=true` por defecto; clamp min/max configurable |
+| Commits sin ticket | Fallback Claude NLP → `default_issue_key` del repo → sin registrar |
+| Privacidad del código | Solo metadata a Claude — mensajes, branch, LOC; nunca el diff |
+| Mono-repo / múltiples proyectos | Repo registry con `default_issue_key` y `jira_project` por repo |
+| Estimaciones mecánicas | Fase 9.5 — human-sensity con señales contextuales y edición manual |
 
 #### Estado
 
-**Futura — alta prioridad relativa.** El registro de worklogs es la funcionalidad más solicitada y la que más tiempo manual ahorra. No requiere la UI de Fase 8 — el MCP tool es suficiente para usuarios de Claude Code.
+**Fases 9.1–9.4 completadas (2026-06-22).** El sistema lee repos Git locales, extrae issue keys, estima sesiones de trabajo y registra worklogs en Jira con `dry_run=true` por defecto. Repo registry permite alias cortos y ticket/proyecto por defecto por repo. Pendiente: Fase 9.5 (human-sensity).
 
 ---
 

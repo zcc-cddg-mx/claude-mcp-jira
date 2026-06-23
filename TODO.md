@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: Fase 8a (PAT dinámico) o mejora human-sensity en worklogs.
+Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24 e2e + 52 unit. Próximo: test-git.sh (cobertura Git Intelligence) o Fase 8a (PAT dinámico).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -40,27 +40,10 @@ Actualizar este archivo al completar o añadir tareas.
   - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
 
-- [ ] **MCP tool `sync_git_worklogs` — `repo_path` debería ser opcional** *(bug menor)*
-  - `inputSchema` tiene `"required": ["repo_path"]` pero tras Fase 9.4 tanto `repo_path` como `repo_name` son opcionales (se usa el default si no se provee ninguno)
-  - Fix: quitar `repo_path` de `required` en `jira_mcp/server.py`
-
 - [ ] **Test e2e para Git Intelligence** *(deuda de cobertura)*
   - `scripts/test-git.sh` no existe — ningún test e2e cubre `POST /git/sync`, `POST/GET/DELETE /git/repos`
   - Los módulos `scanner.py`, `analyzer.py`, `mapper.py`, `repo_registry.py` tampoco tienen unit tests en `tests/`
   - Mínimo recomendado: test-git.sh con dry_run sobre este repo + unit tests para `analyzer.py` y `mapper.py`
-
-- [ ] **Docker: `git sync` no funciona en contenedor** *(limitación arquitectural documentar)*
-  - `POST /git/sync` requiere acceso al filesystem del host (repos locales en `/home/idavid/dev/...`)
-  - En Docker, el service container no monta esos paths — `repo_path` daría error 422 o "not a git repo"
-  - Opciones: (a) montar los repos como volúmenes en `docker-compose.yml`, (b) limitar `git sync` a modo dev (fuera de Docker), (c) documentar como funcionalidad only-dev
-  - Documentar la limitación en `jira_mcp/README.md` y `CLAUDE.md`
-
-- [ ] **`.env.example` no documenta variables de Git Intelligence** *(documentación incompleta)*
-  - Faltan: `GIT_SESSION_GAP_MINUTES`, `GIT_MIN_SESSION_MINUTES`, `GIT_MAX_SESSION_MINUTES`, `GIT_LOC_NUDGE_THRESHOLD`, `GIT_CLAUDE_FALLBACK`, `PROJECT_DB_PATH`
-  - Los defaults están en el código pero el operador no sabe que existen ni cómo ajustarlos
-
-- [ ] **`jira_mcp/README.md` no menciona las 3 nuevas MCP tools** *(documentación incompleta)*
-  - `sync_git_worklogs`, `register_git_repo`, `list_git_repos` añadidas en Fase 9 no están documentadas
 
 - [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
   - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
@@ -158,3 +141,8 @@ Actualizar este archivo al completar o añadir tareas.
 - [x] Lagunas multi-proyecto cerradas (2026-06-22):
   - [x] L1: `clone_issue()` usa config dinámica por proyecto (`get_config(_project_from_key(source_key))`)
   - [x] L2, L3: no requieren fix (documentado en `arch/fix/fix-multi-project-gaps.md`)
+- [x] Deuda documentación Fase 9 cerrada (2026-06-23):
+  - [x] Bug `repo_path` en `required` de MCP `sync_git_worklogs` — quitado (`"required": []`)
+  - [x] `.env.example` sin variables `GIT_*` — añadida sección `GIT INTELLIGENCE` con los 4 parámetros
+  - [x] `jira_mcp/README.md` sin tools Fase 9 — tabla herramientas + RBAC + limitación Docker actualizadas
+  - [x] Limitación Docker `git sync` documentada en `jira_mcp/README.md`

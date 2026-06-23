@@ -210,7 +210,7 @@ def _make_tools() -> list[Tool]:
                         "description": "Optional: filter commits by author email (e.g. carlos.duarte2@mx.zurich.com)",
                     },
                 },
-                "required": ["repo_path"],
+                "required": [],
             },
         ),
         Tool(

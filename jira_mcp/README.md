@@ -16,6 +16,9 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 | `assign_jira_issue` | lead | Asigna un ticket a un usuario |
 | `set_priority_jira_issue` | lead | Cambia la prioridad de un ticket |
 | `create_saz_request` | lead | Crea ticket SAZ (DevOps/Release); `znrx_key` opcional |
+| `sync_git_worklogs` | dev | Lee repo Git local, detecta sesiones de trabajo vinculadas a tickets y registra worklogs. Acepta `repo_name` (alias), `repo_path` (ruta absoluta), o usa el repo default. `dry_run=true` por defecto. |
+| `register_git_repo` | dev | Registra un repo local en el registry: alias → ruta + proyecto Jira + ticket default |
+| `list_git_repos` | dev | Lista los repos registrados en el registry (alias, ruta, proyecto, ticket default) |
 
 ## Seguridad
 
@@ -89,8 +92,8 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 
 | Rol | Herramientas permitidas |
 |---|---|
-| `dev` | `create`, `get`, `search`, `add_comment`, `link` |
-| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request` |
+| `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos` |
+| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos` |
 | `system` | todas |
 
 Ejemplo de configuración con múltiples claves:
@@ -98,3 +101,22 @@ Ejemplo de configuración con múltiples claves:
 ```
 MCP_KEY_ROLES=key-dev-1:dev,key-lead-1:lead,key-system:system
 ```
+
+## Limitaciones conocidas
+
+### `sync_git_worklogs` requiere acceso al filesystem del host
+
+La herramienta `sync_git_worklogs` ejecuta `git log` en rutas locales del host. En Docker, el contenedor del service layer no tiene acceso a esos paths a menos que se monten explícitamente como volúmenes en `docker-compose.yml`.
+
+**Funcionamiento garantizado**: modo dev (`bash scripts/dev.sh both`), donde el service layer corre directamente en el host.
+
+**En Docker**: para usar `git sync`, montar los repos necesarios en `docker-compose.yml`:
+
+```yaml
+services:
+  service:
+    volumes:
+      - /home/usuario/dev/mi-repo:/home/usuario/dev/mi-repo:ro
+```
+
+O bien limitar `sync_git_worklogs` a entornos de desarrollo y no exponer en Docker de producción.

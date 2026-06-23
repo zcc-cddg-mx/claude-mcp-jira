@@ -1,9 +1,21 @@
 import os
+from typing import Optional
 
 import httpx
 
 _SERVICE_URL = os.environ.get("SERVICE_URL", "http://service:8000")
 _TIMEOUT = int(os.environ.get("MCP_SERVICE_TIMEOUT", "30"))
+_CODE_AGENT_URL = os.environ.get("CODE_AGENT_URL", "http://code-agent-mcp:5001")
+_CODE_AGENT_TOKEN = os.environ.get("CODE_AGENT_TOKEN", "")
+_CODE_AGENT_TIMEOUT = int(os.environ.get("CODE_AGENT_TIMEOUT", "30"))
+
+
+def _agent_client() -> httpx.Client:
+    return httpx.Client(
+        base_url=_CODE_AGENT_URL,
+        headers={"X-Agent-Token": _CODE_AGENT_TOKEN},
+        timeout=_CODE_AGENT_TIMEOUT,
+    )
 
 
 def _client(user: str, jira_token: str | None = None) -> httpx.Client:
@@ -175,4 +187,95 @@ def search_issues(query: str, user: str, project: str = None, jira_token: str = 
                 {"key": i["key"], "summary": i["summary"]}
                 for i in d["issues"]
             ],
+        }
+
+
+# ─── Code Agent MCP ──────────────────────────────────────────────────────────
+
+def run_code_agent(
+    repo: str,
+    branch: str,
+    files: list,
+    ticket: str,
+    commit_message: str,
+    base_branch: Optional[str] = None,
+    target: Optional[str] = None,
+) -> dict:
+    body: dict = {
+        "repo": repo,
+        "branch": branch,
+        "files": files,
+        "ticket": ticket,
+        "commit_message": commit_message,
+    }
+    if base_branch:
+        body["base_branch"] = base_branch
+    if target:
+        body["target"] = target
+    with _agent_client() as c:
+        r = c.post("/run", json=body)
+        r.raise_for_status()
+        d = r.json()
+        return {"task_id": d["task_id"], "status": d.get("status", "queued")}
+
+
+def get_code_agent_status(task_id: str) -> dict:
+    with _agent_client() as c:
+        r = c.get(f"/status/{task_id}")
+        r.raise_for_status()
+        d = r.json()
+        result: dict = {
+            "task_id": d["task_id"],
+            "status": d["status"],
+            "ticket": d.get("ticket"),
+        }
+        for field in ("branch", "aux_branch", "commit_id", "error"):
+            if d.get(field):
+                result[field] = d[field]
+        return result
+
+
+def create_azure_pull_request(
+    repo: str,
+    repo_path: str,
+    branch: str,
+    files: list,
+    target: str,
+    ticket: str,
+    title: str,
+    description: str = "",
+) -> dict:
+    body = {
+        "repo": repo,
+        "repo_path": repo_path,
+        "branch": branch,
+        "files": files,
+        "target": target,
+        "ticket": ticket,
+        "title": title,
+        "description": description,
+    }
+    with _agent_client() as c:
+        r = c.post("/azure/prepare-and-pr", json=body)
+        r.raise_for_status()
+        d = r.json()
+        pr = d.get("pr") or {}
+        return {
+            "aux_branch": d.get("aux_branch"),
+            "action": d.get("action"),
+            "pr_id": pr.get("pr_id"),
+            "pr_url": pr.get("pr_url"),
+        }
+
+
+def get_pull_request_status(pr_id: int, repo: str) -> dict:
+    with _agent_client() as c:
+        r = c.get(f"/azure/pull-requests/{pr_id}", params={"repo": repo})
+        r.raise_for_status()
+        d = r.json()
+        return {
+            "pr_id": d["pr_id"],
+            "status": d["status"],
+            "build_status": d["build_status"],
+            "pr_url": d.get("pr_url"),
         }

@@ -314,6 +314,123 @@ def _make_tools() -> list[Tool]:
                 "required": ["text"],
             },
         ),
+        Tool(
+            name="run_code_agent",
+            description="Enqueue a git task in the code-agent-mcp: create feature branch, commit files, push, and create aux branch. Returns a task_id for polling with get_code_agent_status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Absolute path to the local repo clone on the code-agent server (e.g. /repos/ov-arizona-backend-ecuador)",
+                    },
+                    "branch": {
+                        "type": "string",
+                        "description": "Feature branch name to create (e.g. feature/ZNRX_67108_renov_agosto)",
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Absolute paths of files to add and commit",
+                    },
+                    "ticket": {
+                        "type": "string",
+                        "description": "Jira ticket key associated with this task (e.g. ZNRX-67108)",
+                    },
+                    "commit_message": {
+                        "type": "string",
+                        "description": "Git commit message",
+                        "maxLength": max_len,
+                    },
+                    "base_branch": {
+                        "type": "string",
+                        "description": "Branch to cut feature branch from (default: develop)",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Integration branch for aux branch (default: developer)",
+                    },
+                },
+                "required": ["repo", "branch", "files", "ticket", "commit_message"],
+            },
+        ),
+        Tool(
+            name="get_code_agent_status",
+            description="Poll the status of a code-agent-mcp task. Returns task status (queued/running/done/error) and on completion: branch, aux_branch, commit_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "string",
+                        "description": "Task ID returned by run_code_agent",
+                    },
+                },
+                "required": ["task_id"],
+            },
+        ),
+        Tool(
+            name="create_azure_pull_request",
+            description="Idempotent: ensure auxiliary branch exists/is up-to-date and find or create the auxiliary PR in Azure DevOps. Returns action (created/updated/unchanged), pr_id, pr_url.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Azure DevOps repository name (e.g. ov-arizona-backend-ecuador)",
+                    },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Absolute local path to the git clone on the code-agent server (e.g. /home/idavid/dev/ov/ov-arizona-backend-ecuador)",
+                    },
+                    "branch": {
+                        "type": "string",
+                        "description": "Feature branch (source of files, e.g. feature/ZNRX_67108_renov_agosto)",
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Absolute paths of files to integrate into the aux branch",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Integration branch — the PR target (e.g. developer, test)",
+                    },
+                    "ticket": {
+                        "type": "string",
+                        "description": "Jira ticket key (e.g. ZNRX-67108)",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "PR title (e.g. 'ZNRX-67108 Renovaciones junio → test')",
+                        "maxLength": 300,
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional PR description",
+                        "maxLength": max_len,
+                    },
+                },
+                "required": ["repo", "repo_path", "branch", "files", "target", "ticket", "title"],
+            },
+        ),
+        Tool(
+            name="get_pull_request_status",
+            description="Get the status of an Azure DevOps PR and its CI build status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pr_id": {
+                        "type": "integer",
+                        "description": "Azure DevOps PR ID (e.g. 2554)",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "Azure DevOps repository name (e.g. ov-arizona-backend-ecuador)",
+                    },
+                },
+                "required": ["pr_id", "repo"],
+            },
+        ),
     ]
 
 
@@ -387,6 +504,31 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.list_git_repos(user=user)
         elif name == "create_saz_request":
             result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user, jira_token=jira_token)
+        elif name == "run_code_agent":
+            result = service_client.run_code_agent(
+                repo=arguments["repo"],
+                branch=arguments["branch"],
+                files=arguments["files"],
+                ticket=arguments["ticket"],
+                commit_message=arguments["commit_message"],
+                base_branch=arguments.get("base_branch"),
+                target=arguments.get("target"),
+            )
+        elif name == "get_code_agent_status":
+            result = service_client.get_code_agent_status(arguments["task_id"])
+        elif name == "create_azure_pull_request":
+            result = service_client.create_azure_pull_request(
+                repo=arguments["repo"],
+                repo_path=arguments["repo_path"],
+                branch=arguments["branch"],
+                files=arguments["files"],
+                target=arguments["target"],
+                ticket=arguments["ticket"],
+                title=arguments["title"],
+                description=arguments.get("description", ""),
+            )
+        elif name == "get_pull_request_status":
+            result = service_client.get_pull_request_status(arguments["pr_id"], arguments["repo"])
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
                 repo_path=arguments.get("repo_path"),

@@ -15,6 +15,12 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Implementación
 
+- [ ] **Verificar empíricamente conversión Task→Sub-task en ZNRX, SCRX, SAZ** *(bajo — se espera mismo comportamiento)*
+  - Limitación documentada en `docs/jira-subtasks.md`: en AIPROJECTS confirmado que la API no lo permite
+  - Tipos de sub-task reales obtenidos para los 4 proyectos (ver tabla en `docs/jira-subtasks.md`)
+  - ZNRX no tiene tipo "Sub-task" genérico — usar `Subtarea Historia` (id=18124) o `Casos de Prueba` (id=18121)
+  - Workaround documentado: crear nuevo Sub-task desde el inicio con `parent` + marcar Task original como Done
+
 - [ ] **Vaciar `JIRA_ALLOWED_PROJECTS`** — allowlist self-service *(decisión pendiente)*
   - Actualmente `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` bloquea proyectos no listados aunque existan en Jira y estén en la DB (validado con ARQX — auto-discovery OK pero create → 400)
   - Propuesta: dejar `JIRA_ALLOWED_PROJECTS=` vacío; el control de acceso real lo da el PAT de Jira (solo puede crear donde tiene permisos)

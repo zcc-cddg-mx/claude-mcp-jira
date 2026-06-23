@@ -158,6 +158,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Workflows por proyecto | `docs/jira-workflows.md` |
 | Evaluaciones externas | `arch/evaluations/` |
 | Base de datos SQLite | `arch/bd/README.md` |
+| Sub-tasks por proyecto (limitaciones API) | `docs/jira-subtasks.md` |
 
 ## Implementation phases
 

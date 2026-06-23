@@ -40,6 +40,28 @@ Actualizar este archivo al completar o añadir tareas.
   - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
 
+- [ ] **MCP tool `sync_git_worklogs` — `repo_path` debería ser opcional** *(bug menor)*
+  - `inputSchema` tiene `"required": ["repo_path"]` pero tras Fase 9.4 tanto `repo_path` como `repo_name` son opcionales (se usa el default si no se provee ninguno)
+  - Fix: quitar `repo_path` de `required` en `jira_mcp/server.py`
+
+- [ ] **Test e2e para Git Intelligence** *(deuda de cobertura)*
+  - `scripts/test-git.sh` no existe — ningún test e2e cubre `POST /git/sync`, `POST/GET/DELETE /git/repos`
+  - Los módulos `scanner.py`, `analyzer.py`, `mapper.py`, `repo_registry.py` tampoco tienen unit tests en `tests/`
+  - Mínimo recomendado: test-git.sh con dry_run sobre este repo + unit tests para `analyzer.py` y `mapper.py`
+
+- [ ] **Docker: `git sync` no funciona en contenedor** *(limitación arquitectural documentar)*
+  - `POST /git/sync` requiere acceso al filesystem del host (repos locales en `/home/idavid/dev/...`)
+  - En Docker, el service container no monta esos paths — `repo_path` daría error 422 o "not a git repo"
+  - Opciones: (a) montar los repos como volúmenes en `docker-compose.yml`, (b) limitar `git sync` a modo dev (fuera de Docker), (c) documentar como funcionalidad only-dev
+  - Documentar la limitación en `jira_mcp/README.md` y `CLAUDE.md`
+
+- [ ] **`.env.example` no documenta variables de Git Intelligence** *(documentación incompleta)*
+  - Faltan: `GIT_SESSION_GAP_MINUTES`, `GIT_MIN_SESSION_MINUTES`, `GIT_MAX_SESSION_MINUTES`, `GIT_LOC_NUDGE_THRESHOLD`, `GIT_CLAUDE_FALLBACK`, `PROJECT_DB_PATH`
+  - Los defaults están en el código pero el operador no sabe que existen ni cómo ajustarlos
+
+- [ ] **`jira_mcp/README.md` no menciona las 3 nuevas MCP tools** *(documentación incompleta)*
+  - `sync_git_worklogs`, `register_git_repo`, `list_git_repos` añadidas en Fase 9 no están documentadas
+
 - [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
   - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
   - Objetivo: que los worklogs auto-registrados se sientan naturales, no mecánicos

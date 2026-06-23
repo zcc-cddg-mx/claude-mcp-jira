@@ -128,7 +128,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | Pre-validación | MCP server | Rechaza inputs vacíos o >2000 chars |
 | Output normalizado | MCP server | LLM solo recibe `{key,status}` o `{key,summary}` |
 | SSE timeout | MCP server | `asyncio.wait_for` con `MCP_SSE_TIMEOUT=300s` |
-| Tests unitarios | `tests/` | 52 tests: sanitizer, jql_builder, auth, rbac |
+| Tests unitarios | `tests/` | 96 tests: sanitizer, jql_builder, auth, rbac, git_analyzer, git_mapper, jira_pat_routing |
 
 ## Jira Auth (Server/DC)
 
@@ -177,7 +177,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
 | Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
-| 8a — PAT dinámico | Futura | `X-Jira-Token` header opcional — cada usuario opera con su propia identidad Jira; sin infraestructura adicional |
+| 8a — PAT dinámico | ✅ Completa | `X-Jira-Token` header opcional — `ContextVar` + `JiraAuthMiddleware`; `jira_token` en todos los MCP tools; `pat_source` en audit log |
 | 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
 | 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, `POST /git/sync`, repo registry SQLite (`git_repos`), MCP `sync_git_worklogs`/`register_git_repo`/`list_git_repos` |
 | 9.5 — Human-sensity worklogs | Futura | Señales contextuales (tipo archivo, hora del día, densidad commits) + preview editable human-in-the-loop antes de registrar |

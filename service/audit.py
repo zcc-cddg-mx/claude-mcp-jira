@@ -5,6 +5,8 @@ import os
 import uuid
 from datetime import datetime, timezone
 
+from .clients.jira_client import _request_pat
+
 _LOG_PATH = os.environ.get("AUDIT_LOG_PATH", "audit.log")
 _MAX_BYTES = int(os.environ.get("AUDIT_LOG_MAX_BYTES", str(10 * 1024 * 1024)))  # 10 MB
 _BACKUP_COUNT = int(os.environ.get("AUDIT_LOG_BACKUP_COUNT", "5"))
@@ -41,6 +43,7 @@ def log(
         "input": input_text,
         "claude_payload": claude_payload,
         "jira_key": jira_key,
+        "pat_source": "header" if _request_pat.get() else "env",
         "status": status,
         "error": error,
     }

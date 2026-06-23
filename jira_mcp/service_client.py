@@ -6,10 +6,13 @@ _SERVICE_URL = os.environ.get("SERVICE_URL", "http://service:8000")
 _TIMEOUT = int(os.environ.get("MCP_SERVICE_TIMEOUT", "30"))
 
 
-def _client(user: str) -> httpx.Client:
+def _client(user: str, jira_token: str | None = None) -> httpx.Client:
+    headers: dict = {"x-user": user}
+    if jira_token:
+        headers["X-Jira-Token"] = jira_token
     return httpx.Client(
         base_url=_SERVICE_URL,
-        headers={"x-user": user},
+        headers=headers,
         timeout=_TIMEOUT,
     )
 
@@ -20,11 +23,11 @@ def _require(d: dict, *keys: str, endpoint: str) -> None:
         raise ValueError(f"{endpoint}: missing fields {missing} in response")
 
 
-def create_issue(text: str, user: str, project: str = None) -> dict:
+def create_issue(text: str, user: str, project: str = None, jira_token: str = None) -> dict:
     body = {"text": text}
     if project:
         body["project"] = project
-    with _client(user) as c:
+    with _client(user, jira_token) as c:
         r = c.post("/issues", json=body)
         r.raise_for_status()
         d = r.json()
@@ -32,15 +35,15 @@ def create_issue(text: str, user: str, project: str = None) -> dict:
         return {"key": d["key"], "status": "created"}
 
 
-def update_issue(key: str, text: str, user: str) -> dict:
-    with _client(user) as c:
+def update_issue(key: str, text: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.patch(f"/issues/{key}", json={"text": text})
         r.raise_for_status()
         return {"key": key, "status": "updated"}
 
 
-def get_issue(key: str, user: str) -> dict:
-    with _client(user) as c:
+def get_issue(key: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.get(f"/issues/{key}/summary")
         r.raise_for_status()
         d = r.json()
@@ -48,8 +51,8 @@ def get_issue(key: str, user: str) -> dict:
         return {"key": d["key"], "summary": d["summary"]}
 
 
-def assign_issue(key: str, text: str, user: str) -> dict:
-    with _client(user) as c:
+def assign_issue(key: str, text: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.post(f"/issues/{key}/assign", json={"text": text})
         r.raise_for_status()
         d = r.json()
@@ -57,8 +60,8 @@ def assign_issue(key: str, text: str, user: str) -> dict:
         return {"key": d["key"], "status": "assigned", "assignee": d.get("assignee")}
 
 
-def set_priority(key: str, text: str, user: str) -> dict:
-    with _client(user) as c:
+def set_priority(key: str, text: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.post(f"/issues/{key}/priority", json={"text": text})
         r.raise_for_status()
         d = r.json()
@@ -66,8 +69,8 @@ def set_priority(key: str, text: str, user: str) -> dict:
         return {"key": d["key"], "status": "priority_updated", "priority": d["priority"]}
 
 
-def add_comment(key: str, text: str, user: str) -> dict:
-    with _client(user) as c:
+def add_comment(key: str, text: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.post(f"/issues/{key}/comments", json={"text": text})
         r.raise_for_status()
         d = r.json()
@@ -75,8 +78,8 @@ def add_comment(key: str, text: str, user: str) -> dict:
         return {"key": d["key"], "status": "comment_added"}
 
 
-def link_issues(key: str, text: str, user: str) -> dict:
-    with _client(user) as c:
+def link_issues(key: str, text: str, user: str, jira_token: str = None) -> dict:
+    with _client(user, jira_token) as c:
         r = c.post(f"/issues/{key}/link", json={"text": text})
         r.raise_for_status()
         d = r.json()
@@ -84,11 +87,11 @@ def link_issues(key: str, text: str, user: str) -> dict:
         return {"source_key": d["source_key"], "target_key": d["target_key"], "status": "linked"}
 
 
-def create_saz(text: str, znrx_key, user: str) -> dict:
+def create_saz(text: str, znrx_key, user: str, jira_token: str = None) -> dict:
     body = {"text": text}
     if znrx_key:
         body["znrx_key"] = znrx_key
-    with _client(user) as c:
+    with _client(user, jira_token) as c:
         r = c.post("/issues/saz", json=body)
         r.raise_for_status()
         d = r.json()
@@ -99,7 +102,7 @@ def create_saz(text: str, znrx_key, user: str) -> dict:
         return result
 
 
-def sync_git_worklogs(repo_path: str = None, user: str = "anonymous", since_days: int = 1, dry_run: bool = True, author: str = None, repo_name: str = None) -> dict:
+def sync_git_worklogs(repo_path: str = None, user: str = "anonymous", since_days: int = 1, dry_run: bool = True, author: str = None, repo_name: str = None, jira_token: str = None) -> dict:
     body: dict = {"since_days": since_days, "dry_run": dry_run}
     if repo_path:
         body["repo_path"] = repo_path
@@ -107,7 +110,7 @@ def sync_git_worklogs(repo_path: str = None, user: str = "anonymous", since_days
         body["repo_name"] = repo_name
     if author:
         body["author"] = author
-    with _client(user) as c:
+    with _client(user, jira_token) as c:
         r = c.post("/git/sync", json=body)
         r.raise_for_status()
         d = r.json()
@@ -157,11 +160,11 @@ def list_git_repos(user: str) -> dict:
         return r.json()
 
 
-def search_issues(query: str, user: str, project: str = None) -> dict:
+def search_issues(query: str, user: str, project: str = None, jira_token: str = None) -> dict:
     body = {"query": query}
     if project:
         body["project"] = project
-    with _client(user) as c:
+    with _client(user, jira_token) as c:
         r = c.post("/issues/search", json=body)
         r.raise_for_status()
         d = r.json()

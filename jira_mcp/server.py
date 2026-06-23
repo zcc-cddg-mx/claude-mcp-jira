@@ -65,6 +65,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Optional Jira project key (e.g. ZNRX, AIPROJECTS, SCRX). Defaults to the configured default project.",
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT (Personal Access Token) to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["text"],
             },
@@ -81,6 +85,10 @@ def _make_tools() -> list[Tool]:
                         "description": "Natural language instruction of what to change",
                         "maxLength": max_len,
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["key", "text"],
             },
@@ -92,6 +100,10 @@ def _make_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "key": {"type": "string", "description": "Jira issue key (e.g. PROJ-123)"},
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["key"],
             },
@@ -111,6 +123,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Optional Jira project key to scope the search (e.g. ZNRX, AIPROJECTS, SCRX).",
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -126,6 +142,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Natural language instruction for assignment (e.g. 'assign to carlos.duarte' or 'unassign')",
                         "maxLength": max_len,
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
                     },
                 },
                 "required": ["key", "text"],
@@ -143,6 +163,10 @@ def _make_tools() -> list[Tool]:
                         "description": "Natural language instruction for priority (e.g. 'set priority to high')",
                         "maxLength": max_len,
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["key", "text"],
             },
@@ -159,6 +183,10 @@ def _make_tools() -> list[Tool]:
                         "description": "Natural language description of the comment to add",
                         "maxLength": max_len,
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["key", "text"],
             },
@@ -174,6 +202,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Natural language description of the link (e.g. 'link with ZNRX-456, this ticket depends on it')",
                         "maxLength": max_len,
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
                     },
                 },
                 "required": ["key", "text"],
@@ -208,6 +240,10 @@ def _make_tools() -> list[Tool]:
                     "author": {
                         "type": "string",
                         "description": "Optional: filter commits by author email (e.g. carlos.duarte2@mx.zurich.com)",
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
                     },
                 },
                 "required": [],
@@ -270,6 +306,10 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Optional ZNRX issue key to link the SAZ to (e.g. ZNRX-68126)",
                     },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
                 },
                 "required": ["text"],
             },
@@ -316,23 +356,24 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text="Error: empty input")]
 
     # Dispatch — delegate everything to service layer
+    jira_token = arguments.get("jira_token") or None
     try:
         if name == "create_jira_issue":
-            result = service_client.create_issue(arguments["text"], user, arguments.get("project"))
+            result = service_client.create_issue(arguments["text"], user, arguments.get("project"), jira_token=jira_token)
         elif name == "update_jira_issue":
-            result = service_client.update_issue(arguments["key"], arguments["text"], user)
+            result = service_client.update_issue(arguments["key"], arguments["text"], user, jira_token=jira_token)
         elif name == "get_jira_issue":
-            result = service_client.get_issue(arguments["key"], user)
+            result = service_client.get_issue(arguments["key"], user, jira_token=jira_token)
         elif name == "search_jira_issues":
-            result = service_client.search_issues(arguments["query"], user, arguments.get("project"))
+            result = service_client.search_issues(arguments["query"], user, arguments.get("project"), jira_token=jira_token)
         elif name == "assign_jira_issue":
-            result = service_client.assign_issue(arguments["key"], arguments["text"], user)
+            result = service_client.assign_issue(arguments["key"], arguments["text"], user, jira_token=jira_token)
         elif name == "set_priority_jira_issue":
-            result = service_client.set_priority(arguments["key"], arguments["text"], user)
+            result = service_client.set_priority(arguments["key"], arguments["text"], user, jira_token=jira_token)
         elif name == "add_comment_jira_issue":
-            result = service_client.add_comment(arguments["key"], arguments["text"], user)
+            result = service_client.add_comment(arguments["key"], arguments["text"], user, jira_token=jira_token)
         elif name == "link_jira_issues":
-            result = service_client.link_issues(arguments["key"], arguments["text"], user)
+            result = service_client.link_issues(arguments["key"], arguments["text"], user, jira_token=jira_token)
         elif name == "register_git_repo":
             result = service_client.register_git_repo(
                 name=arguments["name"],
@@ -345,7 +386,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "list_git_repos":
             result = service_client.list_git_repos(user=user)
         elif name == "create_saz_request":
-            result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user)
+            result = service_client.create_saz(arguments["text"], arguments.get("znrx_key"), user, jira_token=jira_token)
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
                 repo_path=arguments.get("repo_path"),
@@ -354,6 +395,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 since_days=arguments.get("since_days", 1),
                 dry_run=arguments.get("dry_run", True),
                 author=arguments.get("author"),
+                jira_token=jira_token,
             )
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]

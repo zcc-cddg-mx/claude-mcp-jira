@@ -1,5 +1,6 @@
 import os
 import time
+from contextvars import ContextVar
 from typing import Optional
 
 import requests
@@ -13,32 +14,38 @@ _JIRA_SAZ_PROJECT_KEY = os.environ.get("JIRA_SAZ_PROJECT_KEY", "SAZ")
 _CA_BUNDLE = os.environ.get("REQUESTS_CA_BUNDLE", True)
 _TIMEOUT = int(os.environ.get("JIRA_TIMEOUT", "10"))
 
-_HEADERS = {
-    "Authorization": f"Bearer {_JIRA_PAT}",
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-}
+# Per-request PAT override — set by JiraAuthMiddleware when X-Jira-Token header is present
+_request_pat: ContextVar[str | None] = ContextVar("request_pat", default=None)
+
+
+def _get_headers() -> dict:
+    pat = _request_pat.get() or _JIRA_PAT
+    return {
+        "Authorization": f"Bearer {pat}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
 
 
 def _get(path: str) -> dict:
-    r = requests.get(f"{_JIRA_URL}{path}", headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT)
+    r = requests.get(f"{_JIRA_URL}{path}", headers=_get_headers(), verify=_CA_BUNDLE, timeout=_TIMEOUT)
     r.raise_for_status()
     return r.json()
 
 
 def _post(path: str, body: dict) -> dict:
-    r = requests.post(f"{_JIRA_URL}{path}", json=body, headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT)
+    r = requests.post(f"{_JIRA_URL}{path}", json=body, headers=_get_headers(), verify=_CA_BUNDLE, timeout=_TIMEOUT)
     r.raise_for_status()
     return r.json()
 
 
 def _put(path: str, body: dict) -> None:
-    r = requests.put(f"{_JIRA_URL}{path}", json=body, headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT)
+    r = requests.put(f"{_JIRA_URL}{path}", json=body, headers=_get_headers(), verify=_CA_BUNDLE, timeout=_TIMEOUT)
     r.raise_for_status()
 
 
 def _post_noret(path: str, body: dict) -> None:
-    r = requests.post(f"{_JIRA_URL}{path}", json=body, headers=_HEADERS, verify=_CA_BUNDLE, timeout=_TIMEOUT)
+    r = requests.post(f"{_JIRA_URL}{path}", json=body, headers=_get_headers(), verify=_CA_BUNDLE, timeout=_TIMEOUT)
     r.raise_for_status()
 
 

@@ -1,7 +1,7 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7, 9.1–9.4, 9.5a completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit.
-Próximo: Fase 8a (PAT dinámico, prerequisito de UI) o decisión de equipo sobre JIRA_ALLOWED_PROJECTS.
+Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 96 unit.
+Próximo: decisión de equipo sobre JIRA_ALLOWED_PROJECTS, o arrancar Fase 8 UI si hay demanda no-técnica demostrada.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -35,12 +35,12 @@ Actualizar este archivo al completar o añadir tareas.
   - `git_sync.py` — paso post-analyzer; usa `final_seconds` para worklog; flag `GIT_HUMANIZER=true`
   - `.env.example` — documentada variable `GIT_HUMANIZER`
 
-- [ ] **Fase 8a — PAT dinámico por usuario** *(prerequisito de Fase 8 UI)*
-  - `X-Jira-Token` header opcional en service layer — sobreescribe `JIRA_PAT` del `.env`
-  - Sin header → usa cuenta de servicio (comportamiento actual, sin ruptura)
-  - Cambios: `ContextVar` en `jira_client.py` + middleware FastAPI + parámetro MCP opcional
-  - Habilita autoría correcta en Jira y es el fundamento de Fase 8 UI
-  - Ver plan completo en `arch/design/implementation-plan.md` → Fase 8a
+- [x] **Fase 8a — PAT dinámico por usuario** *(completado 2026-06-23)*
+  - `ContextVar _request_pat` en `jira_client.py` + `JiraAuthMiddleware` (BaseHTTPMiddleware) en `service/middleware/jira_auth.py`
+  - `X-Jira-Token` header sobreescribe `JIRA_PAT` env; sin header → cuenta de servicio (sin ruptura)
+  - `audit.py` registra `pat_source: "header" | "env"` — token nunca logueado
+  - MCP: `jira_token` parámetro opcional en los 9 tools; `service_client.py` lo propaga a `_client()`
+  - Tests unitarios: `tests/test_jira_pat_routing.py` (7 tests: default, override, reset, aislamiento async, None, vacío, no-log)
 
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4

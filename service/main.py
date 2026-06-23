@@ -9,6 +9,7 @@ load_dotenv()
 from .routes import actions_router, assign_router, clone_router, comments_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
 from .clients.project_db import init_db, seed
 from .git.repo_registry import init_repo_registry
+from .middleware.jira_auth import JiraAuthMiddleware
 
 _ENV = os.environ.get("APP_ENV", "dev").lower()
 _docs_url = "/docs" if _ENV == "dev" else None
@@ -53,11 +54,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="claude-mcp-jira service",
     description="Service layer between CLI and Claude/Jira APIs",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=lifespan,
     docs_url=_docs_url,
     redoc_url=_redoc_url,
 )
+
+app.add_middleware(JiraAuthMiddleware)
 
 app.include_router(actions_router)
 app.include_router(git_repos_router)

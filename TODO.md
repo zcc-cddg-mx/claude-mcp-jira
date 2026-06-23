@@ -1,7 +1,7 @@
 # TODO — claude-mcp-jira
 
 Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 96 unit.
-Próximo: decisión de equipo sobre JIRA_ALLOWED_PROJECTS, o arrancar Fase 8 UI si hay demanda no-técnica demostrada.
+Próximo: Azure PR en el code-agent (ov-suscripcion-automation); luego conectar desde aquí vía MCP tool.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -28,6 +28,20 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
+- [ ] **Fase 11 — Azure DevOps PR** *(siguiente — implementar en code-agent, luego MCP tool aquí)*
+  - **Decisión de diseño**: lógica de PR va en `ov-suscripcion-automation` (code-agent), NO aquí
+    - El code-agent ya crea branch + push; el PR es el paso natural siguiente en ese mismo agente
+    - `claude-mcp-jira` agrega un MCP tool `create_azure_pull_request` que llama al endpoint del code-agent
+  - **En el code-agent** (`ov-suscripcion-automation`):
+    - `POST /azure/pull-requests` — recibe `{branch, target, title, description, repo}` y crea el PR via Azure DevOps REST API v7
+    - Credencial: `AZURE_PAT` en `.env` del code-agent (Bearer token o Basic auth base64)
+    - Endpoint Azure: `https://dev.azure.com/{org}/{project}/_apis/git/repositories/{repo}/pullrequests?api-version=7.1`
+    - Retorna `{pr_id, pr_url, status}` al caller
+  - **En este repo** (claude-mcp-jira):
+    - MCP tool `create_azure_pull_request` (lead) — llama al endpoint del code-agent via `service_client`
+    - Parámetros: `branch`, `title`, `description` (texto libre → Claude extrae), `repo`, `target` (default: `developer`)
+  - **Prerequisito**: verificar que el code-agent HTTP API (`app.py`) esté funcional en `/home/idavid/dev/ov/ov-suscripcion-automation`
+
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4
   - **Decisión previa**: ¿hay usuarios no-técnicos que necesiten esto? Sin esa respuesta, no construir
@@ -41,9 +55,9 @@ Actualizar este archivo al completar o añadir tareas.
 
 - [ ] **Fase 10 — Orchestrator Service** *(futura — solo después de Fase 8 con adopción real)*
   - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → sección 4 y 11
-  - Nuevo servicio que coordina: Git Service + Jira Service (actual) + PR Service + Worklog Service
+  - Nuevo servicio que coordina: Git Service + Jira Service (actual) + PR Service (code-agent) + Worklog Service
   - Sin este servicio, flujos complejos (crear rama + ticket + PR + SAZ + worklog) son secuencias manuales
-  - **Prerequisito**: Fase 8 UI con adopción validada (Fase 8a ya completa)
+  - **Prerequisito**: Fase 8 UI con adopción validada + Fase 11 Azure PR funcional
   - Credenciales: por ahora `.env`; si escala → vault o DB cifrada (no construir vault antes de tener el problema)
 
 ---

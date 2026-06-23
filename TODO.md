@@ -1,6 +1,7 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit. Próximo: Fase 8a (PAT dinámico) o decisión JIRA_ALLOWED_PROJECTS.
+Estado general: Fases 1–5, 7 y 9.1–9.4 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26 e2e + 89 unit.
+Próximo accionable sin UI: Fase 9.5a (Claude humanizer). Decisión estratégica previa a UI: validar demanda no-técnica en el equipo.
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -27,30 +28,48 @@ Actualizar este archivo al completar o añadir tareas.
   - Impacto: cambio solo en `.env` + reinicio; no requiere código
   - Pendiente de decisión con el equipo antes de aplicar en producción
 
-- [ ] **Fase 8a — PAT dinámico por usuario** *(futura — corto plazo, bajo esfuerzo)*
+- [ ] **Fase 9.5a — Claude humanizer de estimación** *(accionable sin UI — mejora concreta)*
+  - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` (estrategia 2.5)
+  - El analyzer hoy solo usa span temporal + LOC nudge; Claude puede interpretar semánticamente los mensajes
+  - Nuevo prompt en `service/prompts/git_humanizer.txt`: recibe mensajes de commit + archivos cambiados + hora del día → devuelve `adjusted_hours + reason`
+  - Integrar en `git_sync.py` como paso post-analyzer (antes del dry_run): si Claude ajusta, se reporta en `GitSessionResult` con campo `humanizer_reason`
+  - `dry_run=true` ya existe → el preview sigue siendo el human-in-the-loop suficiente por ahora
+  - **No implementar** learning layer ni factores multiplicadores hasta tener UI
+
+- [ ] **Fase 8a — PAT dinámico por usuario** *(prerequisito de Fase 8 UI)*
   - `X-Jira-Token` header opcional en service layer — sobreescribe `JIRA_PAT` del `.env`
   - Sin header → usa cuenta de servicio (comportamiento actual, sin ruptura)
   - Cambios: `ContextVar` en `jira_client.py` + middleware FastAPI + parámetro MCP opcional
   - Habilita autoría correcta en Jira y es el fundamento de Fase 8 UI
   - Ver plan completo en `arch/design/implementation-plan.md` → Fase 8a
 
-- [ ] **Fase 8 — UI** *(futura — solo si hay demanda no-técnica demostrada)*
-  - Ver `arch/evaluations/eval-ui-copilot.md` y evaluación en `arch/design/implementation-plan.md`
-  - Recomendación: Streamlit MVP primero; migrar a Next.js si hay adopción real
-  - Login PAT → JWT (PAT nunca al frontend); preview human-in-the-loop
+- [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — arrancar solo si hay demanda no-técnica demostrada)*
+  - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → roadmap Fase 1–4
+  - **Decisión previa**: ¿hay usuarios no-técnicos que necesiten esto? Sin esa respuesta, no construir
+  - Fase 1 UI (quick win): registro de horas desde Git con preview editable + factores humanos (checkbox debugging/meetings)
+  - Fase 2 UI: gestión de tickets Jira desde formulario (crear, actualizar, transición)
+  - Fase 3 UI: PR automation (trigger manual → branch → push → PR en Azure DevOps/GitHub)
+  - Fase 4 UI: Orchestrator completo (workflows configurables Git+Jira+PR+SAZ en un flujo)
+  - Stack recomendado: Streamlit MVP → Next.js si hay adopción; login PAT → JWT (PAT nunca al frontend)
   - Implica añadir `POST /auth/login` y `GET /me` al service layer
+  - **No construir Orchestrator Service antes de validar adopción** — riesgo de plataforma sin usuarios
 
-
-- [ ] **Fase 9.5 — Human-sensity en worklogs** *(futura — mejora de calidad)*
-  - Ver `arch/evaluations/eval-human-sensity-worklogs.md` (pendiente de crear)
-  - Objetivo: que los worklogs auto-registrados se sientan naturales, no mecánicos
-  - Señales adicionales: tipo de archivo cambiado, hora del día, densidad de commits, patrón de mensajes
-  - Human-in-the-loop: preview editable antes de registrar (`dry_run=true` + ajuste manual)
-  - Integración con `default_issue_key` del repo registry para fallbacks con sentido
+- [ ] **Fase 10 — Orchestrator Service** *(futura — solo después de Fase 8 con adopción real)*
+  - Evaluación: `arch/evaluations/eval-orchestrator-copilot.md` → sección 4 y 11
+  - Nuevo servicio que coordina: Git Service + Jira Service (actual) + PR Service + Worklog Service
+  - Sin este servicio, flujos complejos (crear rama + ticket + PR + SAZ + worklog) son secuencias manuales
+  - **Prerequisito**: Fase 8 UI con adopción validada + Fase 8a PAT dinámico
+  - Credenciales: por ahora `.env`; si escala → vault o DB cifrada (no construir vault antes de tener el problema)
 
 ---
 
 ## Futuros cambios (sin fecha — activar cuando el volumen lo justifique)
+
+- **Fase 9.5b — Human factors + learning layer** *(después de Fase 8 UI)*
+  - Factores multiplicadores interactivos: debugging (+30%), meetings (+15%), investigación (+25%) — requieren checkbox en UI
+  - Learning layer por usuario: `user_factor = avg(user_input / system_estimate)` persistido en SQLite; ajusta estimación futura automáticamente
+  - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` estrategias 2.2 y 2.4
+  - **No implementar** sin UI — los checkboxes sin interfaz gráfica no tienen UX viable
 
 - **Fase 6 — Observabilidad**
   - Métricas Prometheus en `/metrics`

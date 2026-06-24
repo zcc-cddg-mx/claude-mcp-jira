@@ -625,7 +625,8 @@ Para sesiones sin key: regex → Claude NLP → default_issue_key del repo (conf
 | 9.2 | Estimación de tiempo + registro real de worklogs | ✅ Completa |
 | 9.3 | MCP tool `sync_git_worklogs` + Claude fallback | ✅ Completa |
 | 9.4 | Repo registry SQLite + CRUD + MCP tools register/list | ✅ Completa |
-| 9.5 | Human-sensity — señales contextuales + preview editable human-in-the-loop | Futura |
+| 9.5a | Claude humanizer — ajuste semántico de estimaciones | ✅ Completa |
+| 9.5b | Human-sensity — factores multiplicadores + learning layer por usuario | Futura — requiere Fase 10 + UI |
 
 #### Riesgos y mitigaciones
 
@@ -637,9 +638,95 @@ Para sesiones sin key: regex → Claude NLP → default_issue_key del repo (conf
 | Mono-repo / múltiples proyectos | Repo registry con `default_issue_key` y `jira_project` por repo |
 | Estimaciones mecánicas | Fase 9.5 — human-sensity con señales contextuales y edición manual |
 
+#### Fase 9.5a — Claude humanizer ✅ Completa (2026-06-23)
+
+Ajuste semántico de estimaciones git con Claude antes de registrar worklogs:
+
+- `service/prompts/git_humanizer.txt` — detecta señales: debugging keywords, alta complejidad (LOC>400), trabajo nocturno (20–23h / 0–5h)
+- `parse_git_humanizer(session)` en `claude_client.py` — devuelve multiplicador; clamp 0.25–4.0h, redondeo 0.25h; falla silenciosamente al valor base
+- `GitSessionResult` — campo `base_estimated_hours` (solo cuando hay ajuste) + `humanizer_reason`
+- Flag `GIT_HUMANIZER=true` en `.env.example`
+
 #### Estado
 
-**Fases 9.1–9.4 completadas (2026-06-22).** El sistema lee repos Git locales, extrae issue keys, estima sesiones de trabajo y registra worklogs en Jira con `dry_run=true` por defecto. Repo registry permite alias cortos y ticket/proyecto por defecto por repo. Pendiente: Fase 9.5 (human-sensity).
+**Fases 9.1–9.4 + 9.5a completadas.** El sistema lee repos Git locales, extrae issue keys, estima sesiones de trabajo con ajuste semántico Claude y registra worklogs en Jira con `dry_run=true` por defecto. Pendiente: Fase 9.5b (human factors + learning layer, requiere UI).
+
+---
+
+## Fase 11 — Integración code-agent-mcp ✅ Completa (2026-06-23)
+
+**Objetivo**: delegar las operaciones git y Azure DevOps PR al servicio `code-agent-mcp` ya funcional.
+
+### Nuevo módulo: `service/clients/code_agent_client.py`
+
+Cliente httpx hacia `code-agent-mcp`. Auth: `X-Agent-Token: {CODE_AGENT_TOKEN}`.
+
+```python
+CODE_AGENT_URL=http://code-agent-mcp:5001   # default
+CODE_AGENT_TOKEN=                            # mismo valor que TOKEN_AZURE del agente
+CODE_AGENT_TIMEOUT=30
+```
+
+Funciones: `run_task()`, `get_task_status()`, `prepare_and_pr()`, `get_pr_status()`.
+
+### MCP tools añadidos
+
+| Tool | Rol | Endpoint code-agent |
+|---|---|---|
+| `run_code_agent` | lead | `POST /run` — encola tarea git; 202 inmediato + `task_id` |
+| `get_code_agent_status` | dev | `GET /status/{task_id}` — estado + steps + branch + commit_id |
+| `create_azure_pull_request` | lead | `POST /azure/prepare-and-pr` — idempotente |
+| `get_pull_request_status` | dev | `GET /azure/pull-requests/{pr_id}` — estado PR + build CI |
+
+### `jira_mcp/service_client.py`
+
+`_agent_client()` — cliente httpx independiente del `_client()` Jira (diferente URL, auth y timeout).
+
+### Criterio de éxito
+
+```bash
+bash scripts/test-code-agent.sh   # 19/19 tests (schema, dispatch, funciones, env vars)
+```
+
+Flujo completo validado con PRs #2552–#2554 reales en Azure DevOps Zurich Insurance Ecuador.
+
+---
+
+## Fase 10 — Workflow Orchestrator (pendiente — siguiente prioridad)
+
+**Objetivo**: formalizar la orquestación implícita Jira→git→PR en una entidad `WorkflowExecution` persistida en SQLite, con 4 endpoints REST y 2 MCP tools.
+
+**Evaluación**: `arch/evaluations/eval-workflow-copilot.md` — arquitectura validada; orquestación dispersa identificada como deuda crítica antes de construir UI.
+
+**Diseño completo**: `arch/workflows/workflow-orchestrator.md`.
+
+### Decisiones de diseño
+
+- El MCP tool ejecuta los pasos secuencialmente y hace el polling
+- El service layer solo persiste estado (`WorkflowExecution` en SQLite)
+- Entry point es un `issue_key` ya existente (ZNRX-123)
+
+### Nuevos archivos
+
+| Archivo | Responsabilidad |
+|---|---|
+| `service/clients/workflow_store.py` | SQLite tabla `workflow_executions` — CRUD |
+| `service/schemas/workflow_schemas.py` | Pydantic: `CreateFeaturePRRequest`, `WorkflowExecutionResponse` |
+| `service/routes/workflows.py` | `POST /workflows/create-feature-pr`, `GET /workflows/{id}`, `PATCH /workflows/{id}` |
+
+### Workflow `CreateFeaturePR` — 6 steps
+
+1. `preview` — `POST /azure/prepare-and-pr/preview` (detecta base_branch + files, dry-run)
+2. `run_agent` — `POST /run` → task_id
+3. `wait_agent` — polling `GET /status/{task_id}` (max 60 × 5s = 5 min)
+4. `create_pr` — `POST /azure/prepare-and-pr` (idempotente)
+5. `wait_ci` — polling `GET /azure/pull-requests/{pr_id}` (max 120 × 15s = 30 min)
+6. `update_jira` — link PR + comentario + transición "In Review"
+
+### MCP tools nuevos
+
+- `run_create_feature_pr_workflow` (lead) — orquesta los 6 steps + persiste progreso
+- `get_workflow_status` (dev) — consulta estado por `execution_id`
 
 ---
 

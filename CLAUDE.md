@@ -165,6 +165,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
 | MCP server config | `jira_mcp/README.md` |
 | Integración code-agent-mcp (Fase 11) | `arch/code-agent/integration-plan.md` |
+| Workflow Orchestrator (Fase 10) | `arch/workflows/workflow-orchestrator.md` |
 | Proyectos Jira (restricciones, TICKET_LANG) | `docs/jira-projects.md` |
 | Campos requeridos por proyecto | `docs/jira-fields.md` |
 | Permisos efectivos del usuario | `docs/jira-roles.md` |
@@ -192,10 +193,11 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
 | Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
 | 8a — PAT dinámico | ✅ Completa | `X-Jira-Token` header opcional — `ContextVar` + `JiraAuthMiddleware`; `jira_token` en todos los MCP tools; `pat_source` en audit log |
-| 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token |
+| 8 — UI | Futura | Streamlit MVP → Next.js si hay adopción; login PAT → JWT → propaga como X-Jira-Token; requiere Fase 10 |
 | 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, `POST /git/sync`, repo registry SQLite (`git_repos`), MCP `sync_git_worklogs`/`register_git_repo`/`list_git_repos` |
 | 9.5a — Claude humanizer | ✅ Completa | Ajuste semántico de estimaciones git con Claude (debugging, alta complejidad, trabajo nocturno) |
-| 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere UI |
+| 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere Fase 10 + UI |
+| 10 — Workflow Orchestrator | **Pendiente** | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); diseño en `arch/workflows/workflow-orchestrator.md` |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
 
 ## Test tickets (limpieza)

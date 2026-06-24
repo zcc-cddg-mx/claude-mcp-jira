@@ -36,25 +36,26 @@ Actualizar este archivo al completar o añadir tareas.
 
 - [ ] **Fase 10 — Workflow Orchestrator** *(siguiente prioridad — prerequisito para UI y worklogs integrados)*
   - Evaluación: `arch/evaluations/eval-workflow-copilot.md` — orquestación implícita detectada como deuda crítica
+  - **Diseño completo**: `arch/workflows/workflow-orchestrator.md` — especificación de arquitectura, contratos y pasos
   - **Por qué ahora**: el flujo Jira→git→PR ya existe disperso en MCP + service layer + "scripts mentales"; formalizarlo antes de añadir UI evita acoplamiento y debugging infernal
-  - **Módulo nuevo**: `service/orchestrator/` con `workflows.py`, `engine.py`, `state.py`
-  - **Entidad clave**: `WorkflowExecution { id, ticket, status, steps: [...] }` — estado de negocio explícito (no solo `task_status` técnico)
-  - **Workflow principal a implementar**: `CreateFeaturePRWorkflow`:
-    1. `create_jira_issue` → ZNRX-XXXXX
-    2. `POST /azure/prepare-and-pr/preview` → dry-run: detecta rama base + archivos (endpoint ya existe en code-agent-mcp)
-    3. `run_code_agent` → task_id (202); `steps` tracked: create_branch / commit_push / create_aux_branch
-    4. `wait_until_done(task_id)` → {branch, aux_branch, commit_id, steps}
-    5. `create_azure_pull_request` → {action, pr_id, pr_url}  (idempotente)
-    6. `wait_ci(pr_id)` → build verde
-    7. `PATCH /azure/pull-requests/<pr_id>` → completar PR cuando aprobado (endpoint ya existe)
-    8. `update_jira` → link PR + transición "In Review"
-    9. `suggest_worklogs` → preview editable (Fase 9.5b)
-  - **Problema resuelto**: MCP solo decide y llama tools; NO coordina workflows completos directamente
-  - **Naming automático**: rama siempre `feature/ZNRX-123-descripcion` + linking PR→Jira automático
-  - **code-agent-mcp ya provee**: detect_base_branch automático, detect_changed_files, pr_store persistente, step tracking
-  - **Prerequisito para**: Fase 8 UI (que mostrará progreso por paso) y Fase 9.5b (worklogs post-PR)
-  - **MCP tools candidatos adicionales** (no urgentes — sólo cuando el Orchestrator los necesite):
-    - `preview_code_agent` → `POST /azure/prepare-and-pr/preview` (dry-run antes de ejecutar)
+  - **Decisiones de diseño**: MCP tool hace el polling; service layer solo persiste estado; entry point es `issue_key` ya existente
+  - **Nuevos archivos a crear**:
+    - `service/clients/workflow_store.py` — SQLite tabla `workflow_executions` (CRUD); patrón: `project_db.py`
+    - `service/schemas/workflow_schemas.py` — `CreateFeaturePRRequest`, `WorkflowExecutionResponse`, `WorkflowUpdateRequest`
+    - `service/routes/workflows.py` — `POST /workflows/create-feature-pr`, `GET /workflows/{id}`, `GET /workflows`, `PATCH /workflows/{id}`
+  - **Archivos a modificar**: `service/main.py` (lifespan + router), `service/routes/__init__.py`, `jira_mcp/server.py`, `jira_mcp/service_client.py`
+  - **Workflow `CreateFeaturePR`** (6 steps — entry point: `issue_key` ya existente):
+    1. `preview` — `POST /azure/prepare-and-pr/preview` → detecta base_branch + files (dry-run)
+    2. `run_agent` — `POST /run` → task_id
+    3. `wait_agent` — polling `GET /status/{task_id}` (max 60 × 5s = 5 min)
+    4. `create_pr` — `POST /azure/prepare-and-pr` (idempotente)
+    5. `wait_ci` — polling `GET /azure/pull-requests/{pr_id}` (max 120 × 15s = 30 min)
+    6. `update_jira` — link PR + comentario + transición "In Review"
+  - **2 MCP tools nuevos**:
+    - `run_create_feature_pr_workflow` (lead) — orquesta los 6 pasos, persiste progreso tras cada uno
+    - `get_workflow_status` (dev) — consulta `WorkflowExecution` por `execution_id`
+  - **Prerequisito para**: Fase 8 UI (progreso por paso) y Fase 9.5b (worklogs post-PR)
+  - **MCP tools candidatos adicionales** (no urgentes — solo cuando el Orchestrator los necesite):
     - `complete_pull_request` → `PATCH /azure/pull-requests/<pr_id>` (completar PR aprobado)
     - `list_pull_requests` → `GET /prs` (listar PRs del agente)
 

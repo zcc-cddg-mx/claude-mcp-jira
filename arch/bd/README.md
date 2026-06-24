@@ -139,14 +139,70 @@ Módulo: `service/git/repo_registry.py` — funciones `init_repo_registry()`, `r
 
 ---
 
+---
+
+## Tabla `workflow_executions` (Fase 10 — pendiente)
+
+Registro de ejecuciones del Workflow Orchestrator. Persiste el estado de negocio de cada orquestación Jira→git→PR.
+
+### Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS workflow_executions (
+    execution_id   TEXT PRIMARY KEY,           -- UUID 8 chars
+    workflow_type  TEXT NOT NULL,              -- "create_feature_pr"
+    issue_key      TEXT NOT NULL,              -- ZNRX-123
+    status         TEXT NOT NULL,              -- pending|running|completed|failed
+    steps_json     TEXT NOT NULL DEFAULT '[]', -- [{name, status, detail?}]
+    result_json    TEXT,                       -- {pr_id, pr_url, branch, aux_branch} al completar
+    error          TEXT,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    user           TEXT NOT NULL
+);
+```
+
+### Columnas
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `execution_id` | TEXT PK | UUID corto (8 chars) |
+| `workflow_type` | TEXT | `"create_feature_pr"` (único tipo por ahora) |
+| `issue_key` | TEXT | Ticket Jira de entrada (ej. `ZNRX-123`) — ya debe existir |
+| `status` | TEXT | `pending` → `running` → `completed` | `failed` |
+| `steps_json` | TEXT (JSON) | Array de `{name, status, detail?}` — uno por paso del workflow |
+| `result_json` | TEXT (JSON) | `{pr_id, pr_url, branch, aux_branch}` cuando `status=completed` |
+| `error` | TEXT | Mensaje de error cuando `status=failed` |
+| `created_at` | TEXT (ISO 8601) | Timestamp UTC de creación |
+| `updated_at` | TEXT (ISO 8601) | Timestamp UTC de última actualización |
+| `user` | TEXT | Usuario que inició el workflow (header `x-user`) |
+
+### Steps del workflow `CreateFeaturePR`
+
+| Step name | Endpoint code-agent/jira | Estado posible |
+|---|---|---|
+| `preview` | `POST /azure/prepare-and-pr/preview` | pending → running → done/failed |
+| `run_agent` | `POST /run` | pending → running → done/failed |
+| `wait_agent` | `GET /status/{task_id}` (polling) | pending → running → done/failed |
+| `create_pr` | `POST /azure/prepare-and-pr` | pending → running → done/failed |
+| `wait_ci` | `GET /azure/pull-requests/{pr_id}` (polling) | pending → running → done/failed |
+| `update_jira` | `PATCH /issues/{key}` | pending → running → done/failed |
+
+### Módulo
+
+`service/clients/workflow_store.py` — patrón idéntico a `project_db.py` (`threading.Lock` + upsert). Funciones: `init_workflow_db()`, `create_execution()`, `update_execution()`, `get_execution()`, `list_executions()`.
+
+---
+
 ## Inicialización
 
-Ambas tablas se crean al arrancar el service layer (lifespan FastAPI):
+Las tres tablas se crean al arrancar el service layer (lifespan FastAPI):
 
 ```python
 # service/main.py
-init_db()           # crea tabla projects + seed ZNRX/AIPROJECTS/SCRX
+init_db()             # crea tabla projects + seed ZNRX/AIPROJECTS/SCRX
 init_repo_registry()  # crea tabla git_repos
+init_workflow_db()    # crea tabla workflow_executions (Fase 10 — pendiente)
 ```
 
 La inicialización es idempotente (`CREATE TABLE IF NOT EXISTS`).

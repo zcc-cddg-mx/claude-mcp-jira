@@ -36,7 +36,7 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 | `create_azure_pull_request` | lead | Idempotente: asegura que la rama auxiliar existe/está al día y crea (o devuelve el existente) el PR en Azure DevOps. Retorna `action` (created/updated/unchanged), `pr_id`, `pr_url`. |
 | `get_pull_request_status` | dev | Estado del PR (`active/completed/abandoned`) + build CI (`pending/succeeded/failed/unknown`). |
 
-**Flujo orquestado desde Claude Code:**
+**Flujo orquestado desde Claude Code (Fase 11 — herramientas individuales):**
 ```
 1. create_jira_issue       → ZNRX-XXXXX
 2. run_code_agent          → task_id  (202 inmediato)
@@ -47,6 +47,27 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 ```
 
 **Requisito**: `code-agent-mcp` corriendo en `CODE_AGENT_URL` (default `http://code-agent-mcp:5001`). Ver `arch/code-agent/integration-plan.md`.
+
+### Workflow Orchestrator (Fase 10 — pendiente)
+
+| Herramienta | Rol mínimo | Descripción |
+|---|---|---|
+| `run_create_feature_pr_workflow` | lead | Ejecuta el workflow completo en un solo tool: preview → git → PR → CI → link Jira. Persiste progreso paso a paso. Retorna `execution_id` + estado final. |
+| `get_workflow_status` | dev | Consulta estado de una `WorkflowExecution` por `execution_id` (útil para diagnóstico o retry manual). |
+
+**Flujo unificado (Fase 10 — un solo tool):**
+```
+run_create_feature_pr_workflow(issue_key, repo, repo_path, commit_message)
+  → preview       detecta base_branch + files (dry-run)
+  → run_agent     encola tarea git → task_id
+  → wait_agent    polling hasta done (max 5 min)
+  → create_pr     PR idempotente en Azure DevOps
+  → wait_ci       polling build CI (max 30 min)
+  → update_jira   link PR + comentario + transición "In Review"
+  → {execution_id, branch, pr_id, pr_url, status: "completed"}
+```
+
+**Diseño**: `arch/workflows/workflow-orchestrator.md`.
 
 ## Seguridad
 
@@ -123,8 +144,8 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 
 | Rol | Herramientas permitidas |
 |---|---|
-| `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `get_code_agent_status`, `get_pull_request_status` |
-| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `run_code_agent`, `get_code_agent_status`, `create_azure_pull_request`, `get_pull_request_status` |
+| `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `get_code_agent_status`, `get_pull_request_status`, `get_workflow_status` |
+| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `run_code_agent`, `get_code_agent_status`, `create_azure_pull_request`, `get_pull_request_status`, `run_create_feature_pr_workflow`, `get_workflow_status` |
 | `system` | todas |
 
 Ejemplo de configuración con múltiples claves:

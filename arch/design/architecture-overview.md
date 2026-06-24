@@ -2,7 +2,7 @@
 
 **Proyecto**: claude-mcp-jira  
 **Entorno**: red corporativa Zurich — Jira Server/Data Center (`jira.zurich.com`)  
-**Fecha**: Junio 2026 — estado post-Fase 7b
+**Fecha**: Junio 2026 — estado post-Fase 11 (Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 11 completas)
 
 ---
 
@@ -13,13 +13,13 @@ Sistema de tres capas que permite gestionar tickets Jira en lenguaje natural des
 ```
 [CLI (Typer)]     ──HTTP──►
                             [Service Layer (FastAPI :18000)] ──► [LiteLLM proxy → Claude API]
-[MCP Server SSE]  ──HTTP──►                                  ──► [Jira REST API v2]
-     :18001                                                        jira.zurich.com
+[MCP Server SSE]  ──HTTP──►                                  ──► [Jira REST API v2 — jira.zurich.com]
+     :18001                                                   ──► [code-agent-mcp :5001 — git + Azure PR]
        ▲
 [Claude Code]
 ```
 
-**Principio central**: el MCP server y la CLI nunca llaman a Claude ni a Jira directamente. Todo pasa por el service layer, que concentra la sanitización, el audit log y la lógica de negocio.
+**Principio central**: el MCP server y la CLI nunca llaman a Claude, Jira ni Azure directamente. Todo pasa por el service layer, que concentra la sanitización, el audit log y la lógica de negocio. Las operaciones git/PR se delegan a `code-agent-mcp` vía HTTP con `X-Agent-Token`.
 
 ---
 
@@ -63,6 +63,10 @@ Núcleo del sistema. Expone una API REST interna y es el único componente que h
 | `/issues/saz` | POST | Crear ticket SAZ; `znrx_key` opcional para vincularlo |
 | `/projects` | GET | Lista proyectos registrados en DB |
 | `/projects/{key}` | GET | Config de un proyecto; dispara auto-discovery si no existe |
+| `/git/sync` | POST | Leer repo Git local → sesiones → worklogs Jira (dry_run por defecto) |
+| `/git/repos` | POST/GET/DELETE | Registro de repos Git (alias → ruta + proyecto Jira) |
+| `/workflows/create-feature-pr` | POST | Crear registro WorkflowExecution pending (Fase 10 — pendiente) |
+| `/workflows/{id}` | GET/PATCH | Consultar o actualizar estado de un workflow (Fase 10 — pendiente) |
 | `/health` | GET | Health check |
 
 Responsabilidades exclusivas del service layer:
@@ -95,6 +99,7 @@ Cualquier otro proyecto Jira válido se registra en el primer acceso, sin interv
 |---|---|---|---|
 | `claude_client.py` | LiteLLM proxy → Claude API | `ANTHROPIC_AUTH_TOKEN` | Firewall Zurich |
 | `jira_client.py` | `jira.zurich.com` REST API v2 | `Bearer <JIRA_PAT>` | `zurich-root-ca.crt` |
+| `code_agent_client.py` | `code-agent-mcp :5001` | `X-Agent-Token` | Red interna |
 
 ---
 
@@ -229,10 +234,19 @@ ZNRX-1234  (feature en desarrollo)
 | `search_jira_issues` | ✅ | ✅ | ✅ |
 | `add_comment_jira_issue` | ✅ | ✅ | ✅ |
 | `link_jira_issues` | ✅ | ✅ | ✅ |
+| `sync_git_worklogs` | ✅ | ✅ | ✅ |
+| `register_git_repo` | ✅ | ✅ | ✅ |
+| `list_git_repos` | ✅ | ✅ | ✅ |
+| `get_code_agent_status` | ✅ | ✅ | ✅ |
+| `get_pull_request_status` | ✅ | ✅ | ✅ |
+| `get_workflow_status` | ✅ | ✅ | ✅ |
 | `update_jira_issue` | ❌ | ✅ | ✅ |
 | `assign_jira_issue` | ❌ | ✅ | ✅ |
 | `set_priority_jira_issue` | ❌ | ✅ | ✅ |
 | `create_saz_request` | ❌ | ✅ | ✅ |
+| `run_code_agent` | ❌ | ✅ | ✅ |
+| `create_azure_pull_request` | ❌ | ✅ | ✅ |
+| `run_create_feature_pr_workflow` | ❌ | ✅ | ✅ |
 
 ---
 
@@ -276,26 +290,38 @@ claude-mcp-jira/
 ├── cli/
 │   └── main.py                    # Typer CLI — create, update, summarize, list-issues (--project)
 ├── service/
-│   ├── main.py                    # FastAPI v0.4.0 — lifespan: init_db + seed
-│   ├── audit.py                   # JSON-lines con request_id, rotación 10 MB × 5
+│   ├── main.py                    # FastAPI v0.5.0 — lifespan: init_db + init_repo_registry + seed
+│   ├── audit.py                   # JSON-lines con request_id + pat_source, rotación 10 MB × 5
+│   ├── middleware/
+│   │   └── jira_auth.py           # JiraAuthMiddleware — extrae X-Jira-Token → ContextVar
 │   ├── routes/                    # issues, update, summarize, search, transitions, worklog,
-│   │                              # comments, assign, priority, labels, clone, link, saz, projects, actions
-│   ├── schemas/issue.py           # Todos los schemas Request/Payload/Response
+│   │                              # comments, assign, priority, labels, clone, link, saz, projects,
+│   │                              # actions, git_sync, git_repos [+ workflows — Fase 10]
+│   ├── schemas/
+│   │   ├── issue.py               # Schemas Request/Payload/Response de tickets
+│   │   └── git_schemas.py         # Schemas Git Intelligence
+│   ├── git/
+│   │   ├── scanner.py             # subprocess git log (metadata only)
+│   │   ├── analyzer.py            # group_sessions(), estimate_time()
+│   │   ├── mapper.py              # extract_issue_key() regex + Claude fallback
+│   │   └── repo_registry.py       # SQLite git_repos: alias → ruta + proyecto Jira
 │   ├── clients/
 │   │   ├── sanitizer.py           # Sanitización extendida
-│   │   ├── claude_client.py       # parse_*(). _lang_suffix() per-proyecto
-│   │   ├── jira_client.py         # PAT Bearer + cert + timeout; config dinámica por proyecto
+│   │   ├── claude_client.py       # parse_*(). _lang_suffix() per-proyecto; git_humanizer
+│   │   ├── jira_client.py         # PAT Bearer + ContextVar + cert + timeout; config dinámica
+│   │   ├── code_agent_client.py   # httpx → code-agent-mcp; X-Agent-Token; run/status/pr/pr-status
 │   │   ├── jql_builder.py         # Claude → struct → JQL seguro; project_key opcional
 │   │   ├── project_config.py      # Fachada: get_config(), resolve_project()
-│   │   ├── project_db.py          # SQLite: init_db, seed, get_or_discover, list_projects
+│   │   ├── project_db.py          # SQLite projects: init_db, seed, get_or_discover, list
 │   │   └── rate_limiter.py        # Sliding window por usuario
 │   └── prompts/                   # create, update, summarize, search, transition, log_work,
-│                                  # add_comment, assign, priority, labels, clone, link, saz_create
+│                                  # add_comment, assign, priority, labels, clone, link, saz_create,
+│                                  # git_sync_fallback, git_humanizer
 ├── jira_mcp/
-│   ├── server.py                  # SSE server — 9 herramientas + audit log
+│   ├── server.py                  # SSE server — 16 herramientas + audit log
 │   ├── auth.py                    # API key + IP allowlist
 │   ├── rbac.py                    # Roles dev/lead/system y permisos
-│   ├── service_client.py          # Cliente httpx con output filtrado
+│   ├── service_client.py          # Cliente httpx con output filtrado; _agent_client() independiente
 │   └── README.md
 ├── shared/
 │   └── rate_limiter.py            # RateLimiter compartido entre service y jira_mcp
@@ -303,23 +329,33 @@ claude-mcp-jira/
 │   ├── test_sanitizer.py          # 13 tests
 │   ├── test_jql_builder.py        # 18 tests (escape + injection)
 │   ├── test_auth.py               # 10 tests
-│   └── test_rbac.py               # 11 tests
+│   ├── test_rbac.py               # 11 tests
+│   ├── test_jira_pat_routing.py   # 7 tests (PAT dinámico)
+│   ├── test_git_analyzer.py       # 22 tests
+│   └── test_git_mapper.py         # 15 tests
 ├── docs/
 │   ├── jira-projects.md           # Metadata ZNRX, AIPROJECTS, SAZ, SCRX
 │   ├── jira-fields.md             # Campos requeridos/opcionales por proyecto
 │   ├── jira-roles.md              # Permisos efectivos del usuario
 │   ├── jira-link-types.md         # 29 link types; recomendación SAZ→ZNRX
-│   └── jira-workflows.md          # Statuses y transiciones por proyecto
+│   ├── jira-workflows.md          # Statuses y transiciones por proyecto
+│   └── jira-subtasks.md           # Sub-tasks por proyecto (limitaciones API)
 ├── certs/                         # Certificados raíz corporativos Zurich
 ├── arch/
 │   ├── design/                    # arquitectura + plan de implementación
 │   ├── evaluations/               # evals externas por fase
-│   └── reports/                   # informe técnico MCP
+│   ├── reports/                   # informe técnico MCP
+│   ├── bd/                        # schema SQLite (projects + git_repos + workflow_executions)
+│   ├── code-agent/                # plan de integración Fase 11
+│   └── workflows/                 # diseño Workflow Orchestrator Fase 10
 ├── scripts/
 │   ├── dev.sh                     # arranque/stop/restart/status local
 │   ├── test-dev.sh                # 8 tests e2e service layer
 │   ├── test-mcp.sh                # 10 tests e2e MCP server
-│   └── test-docker.sh             # runner Docker e2e completo
+│   ├── test-multi.sh              # 19 tests e2e multi-proyecto
+│   ├── test-actions.sh            # 24 tests e2e acciones
+│   ├── test-git.sh                # 26 tests e2e Git Intelligence
+│   └── test-code-agent.sh         # 19 tests Fase 11 (schema/dispatch)
 ├── Dockerfile                     # Service layer
 ├── docker-compose.yml             # service (:18000) + mcp (:18001)
 ├── environment.yml

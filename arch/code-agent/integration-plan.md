@@ -10,9 +10,9 @@ genérica del code-agent original y descartando toda lógica específica del dom
 
 ---
 
-## Estado actual del `code-agent-mcp` (2026-06-23)
+## Estado actual del `code-agent-mcp` (2026-06-24)
 
-**73 tests pasando.** Probado e2e contra Azure DevOps — PRs #2552–#2554 reales creados.
+**133 tests.** Funcional e2e contra Azure DevOps (Zurich Insurance Ecuador) — PRs #2552–#2554 reales creados.
 
 ### Módulos implementados
 
@@ -20,26 +20,27 @@ genérica del code-agent original y descartando toda lógica específica del dom
 |---|---|
 | `app.py` | Flask HTTP API, todos los endpoints, Swagger UI (`/apidocs/`) |
 | `src/auth.py` | `X-Agent-Token` header → 401 si falta/incorrecto; `/health` es el único endpoint libre |
-| `src/task_store.py` | SQLite: tabla `tasks` (patrón async 202 + polling) |
-| `src/repo_store.py` | SQLite: tabla `repos` con columna `branch_roles` (JSON) |
+| `src/task_store.py` | SQLite: tabla `tasks` (patrón async 202 + polling); columna `steps` con tracking por paso |
+| `src/repo_store.py` | SQLite: tabla `repos` con columna `branch_roles` (JSON); allowlist de seguridad |
 | `src/project_store.py` | SQLite: tabla `projects` (slug `{org}/{name}`); auto-upsert al registrar repo |
+| `src/pr_store.py` | SQLite: tabla `prs` — registro persistente de pull requests (pr_id, repo, branches, status, task_id) |
 | `src/repo_inspector.py` | Parsea URLs Azure DevOps, `git ls-remote`, clasifica ramas, auto-asigna roles |
-| `src/branch_config.py` | Registro dinámico de ramas con hot-reload; defaults del README de `ov-arizona-backend-ecuador` |
-| `src/placer.py` | Git genérico: `create_feature_branch`, `git_add_commit_push`, `create_auxiliary_branch`, `ensure_auxiliary_branch` (idempotente) |
-| `src/azure_client.py` | Azure DevOps REST API v7.1: crear PR, buscar PR existente, estado PR + build |
+| `src/branch_config.py` | Registro de ramas en SQLite (tabla `branch_config`) — persistente, hot-reload, defaults seeded |
+| `src/placer.py` | Git genérico: `create_feature_branch`, `git_add_commit_push`, `ensure_auxiliary_branch` (idempotente), `detect_base_branch`, `detect_changed_files`, `aux_branch_name` |
+| `src/azure_client.py` | Azure DevOps REST API v7.1: crear PR, buscar PR existente, completar/abandonar PR, estado PR + build |
 | `src/logger.py` | Log estructurado |
 
-### API surface completa
+### API surface completa (22 endpoints)
 
 | Método | Path | Descripción |
 |---|---|---|
 | `GET` | `/health` | Liveness (sin token) |
-| `POST` | `/run` | Encolar tarea git → 202 inmediato |
-| `GET` | `/status/<task_id>` | Estado de la tarea |
+| `POST` | `/run` | Encolar tarea git → 202 inmediato; `steps` tracked internamente |
+| `GET` | `/status/<task_id>` | Estado de la tarea + `steps` por paso (create_branch/commit_push/create_aux_branch) |
 | `GET` | `/tasks` | Últimas N tareas; `?ticket=` filtra por ticket |
-| `GET` | `/config/branches` | Ver registro de ramas |
-| `PUT` | `/config/branches` | Actualizar registro (hot-reload) |
-| `POST` | `/repos` | Registrar repo + inspección inmediata |
+| `GET` | `/config/branches` | Ver diccionario de ramas (desde SQLite) |
+| `PUT` | `/config/branches` | Actualizar diccionario (persiste en SQLite, hot-reload) |
+| `POST` | `/repos` | Registrar repo + inspección inmediata; 403 para repos no registrados en operaciones git |
 | `GET` | `/repos` | Listar repos |
 | `GET` | `/repos/<name>` | Repo por nombre (incluye `branch_roles` + `branches_by_role`) |
 | `POST` | `/repos/<name>/refresh` | Re-inspeccionar repo |
@@ -47,18 +48,24 @@ genérica del code-agent original y descartando toda lógica específica del dom
 | `PATCH` | `/repos/<name>/branches/<branch>` | Corregir rol de una rama (sin re-inspeccionar) |
 | `GET` | `/projects` | Listar proyectos con sus repos |
 | `GET` | `/projects/<org>/<name>` | Proyecto por slug |
-| `POST` | `/azure/prepare-and-pr` | Idempotente: ensure aux branch + find-or-create PR aux ← **endpoint principal** |
+| `POST` | `/azure/prepare-and-pr/preview` | **Dry-run:** detecta rama base y archivos sin efectos; devuelve `existing_pr` si ya hay PR |
+| `POST` | `/azure/prepare-and-pr` | **Endpoint principal** — idempotente: ensure aux branch + find-or-create PR aux |
 | `POST` | `/azure/pull-requests` | Crear feature PR + aux PR simultáneos (legacy) |
 | `GET` | `/azure/pull-requests/<pr_id>` | Estado del PR + build CI |
+| `PATCH` | `/azure/pull-requests/<pr_id>` | Completar / abandonar / reactivar PR |
+| `GET` | `/prs` | Lista PRs persistidos en `pr_store`; `?repo=`, `?status=`, `?task_id=`, `?limit=` |
+| `GET` | `/prs/<pr_id>` | PR individual con estado refrescado desde Azure DevOps |
 
 ### Git flow implementado
 
-Basado en el README de `ov-arizona-backend-ecuador`:
-- Features se cortan desde `develop` (`is_base=True` en branch_config)
+- Features se cortan desde la rama `base` del branch_config (default: `develop`)
+- Rama base se detecta automáticamente con `detect_base_branch()` (git merge-base + rev-list)
+- Archivos modificados se detectan automáticamente con `detect_changed_files()` (git diff --name-only)
 - Rama auxiliar: `{feature_branch}_{target}_auxiliar`, base `origin/{target}`
-- `ensure_auxiliary_branch()` — idempotente: crea si no existe, actualiza si los archivos difieren, no hace nada si está al día
+- `ensure_auxiliary_branch()` — idempotente: crea si no existe, actualiza si los archivos difieren, no-op si está al día
+- Repo registry actúa como allowlist de seguridad: 403 si el repo no está registrado
 
-### Diccionario de ramas (defaults)
+### Diccionario de ramas (defaults — persistidos en SQLite)
 
 | Rama | Label | Rol | `is_base` |
 |---|---|---|---|
@@ -67,6 +74,22 @@ Basado en el README de `ov-arizona-backend-ecuador`:
 | `test` | pruebas | `integration` | — Preprod |
 | `main` | producción-desplegado | `integration` | — Producción |
 
+### Step tracking en tareas
+
+`GET /status/<task_id>` devuelve campo `steps` con estado por paso:
+
+```json
+{
+  "task_id": "a1b2c3d4",
+  "status": "done",
+  "steps": {
+    "create_branch":    "done",
+    "commit_push":      "done",
+    "create_aux_branch":"done"
+  }
+}
+```
+
 ---
 
 ## Pipeline objetivo (claude-mcp-jira como orquestador)
@@ -74,18 +97,18 @@ Basado en el README de `ov-arizona-backend-ecuador`:
 ```
 Claude Code (MCP tools)
   → claude-mcp-jira
-    → Jira          (ya existe — create, update, transition, comment)
-    → code-agent-mcp (nuevo — run_code_agent, get_code_agent_status)
-    → Azure DevOps   (nuevo — create_azure_pull_request, get_pull_request_status)
+    → Jira          (create, update, transition, comment)
+    → code-agent-mcp (run_code_agent, get_code_agent_status)
+    → Azure DevOps   (create_azure_pull_request, get_pull_request_status)
     → Jira           (link PR + transición "In Review")
 ```
 
-Flujo completo desde Claude Code:
+Flujo completo desde Claude Code (Fase 11 — implementado):
 
 ```
 1. create_jira_issue           → ZNRX-XXXXX
 2. run_code_agent              → task_id  (202 inmediato)
-3. get_code_agent_status       → polling → "done" → {branch, aux_branch, commit_id}
+3. get_code_agent_status       → polling → "done" → {branch, aux_branch, commit_id, steps}
 4. create_azure_pull_request   → {action, pr_id, pr_url}  (idempotente via prepare-and-pr)
 5. get_pull_request_status     → esperar build verde
 6. update_jira_issue           → link PR + transición "In Review"
@@ -93,37 +116,35 @@ Flujo completo desde Claude Code:
 
 ---
 
-## Pendiente en `claude-mcp-jira` (Fase 11)
+## Integración desde claude-mcp-jira (Fase 11 — completa)
 
-### Nuevo módulo: `service/clients/code_agent_client.py`
+### Módulo: `service/clients/code_agent_client.py`
 
-Cliente HTTP hacia `code-agent-mcp`. Patrón idéntico a `jira_client.py`.
-
-Variables de entorno a añadir en `claude-mcp-jira`:
+Cliente httpx hacia `code-agent-mcp`. Variables de entorno:
 
 ```
-CODE_AGENT_URL=http://code-agent-mcp:5001   # URL del agente
-CODE_AGENT_TOKEN=                            # mismo valor que TOKEN_AZURE del agente
+CODE_AGENT_URL=http://code-agent-mcp:5001
+CODE_AGENT_TOKEN=                         # mismo valor que TOKEN_AZURE del agente
+CODE_AGENT_TIMEOUT=30
 ```
 
-### MCP tools a añadir en `jira_mcp/server.py`
+### MCP tools implementados en `jira_mcp/server.py`
 
 | Tool | Rol mínimo | Endpoint que llama | Descripción |
 |---|---|---|---|
-| `run_code_agent` | lead | `POST /run` | Texto libre → Claude extrae repo/branch/archivos/ticket; retorna `task_id` |
-| `get_code_agent_status` | dev | `GET /status/<task_id>` | Estado + branch + commit_id |
+| `run_code_agent` | lead | `POST /run` | Encola tarea git; retorna `task_id` |
+| `get_code_agent_status` | dev | `GET /status/<task_id>` | Estado + steps + branch + commit_id |
 | `create_azure_pull_request` | lead | `POST /azure/prepare-and-pr` | Idempotente: ensure aux + find-or-create PR |
 | `get_pull_request_status` | dev | `GET /azure/pull-requests/<pr_id>` | Estado PR + build CI |
 
-### Orden de implementación
+### Endpoints del agente no expuestos como MCP tools (aún)
 
-| Paso | Qué |
-|---|---|
-| 1 | `service/clients/code_agent_client.py` — funciones: `run_task`, `get_task_status`, `prepare_and_pr`, `get_pr_status` |
-| 2 | `jira_mcp/server.py` — añadir 4 tools al schema + dispatch |
-| 3 | `jira_mcp/service_client.py` — añadir 4 funciones que llaman al client |
-| 4 | `scripts/test-code-agent.sh` — e2e del flujo completo |
-| 5 | Actualizar CLAUDE.md, TODO, docs |
+| Endpoint | Descripción | Candidato para |
+|---|---|---|
+| `POST /azure/prepare-and-pr/preview` | Dry-run antes de crear PR | Fase 10 Orchestrator (paso previo) |
+| `PATCH /azure/pull-requests/<pr_id>` | Completar / abandonar PR | Futuro MCP tool `complete_pull_request` |
+| `GET /prs` | Listar PRs registrados | Futuro MCP tool `list_pull_requests` |
+| `GET /prs/<pr_id>` | PR con estado refrescado | Puede unificarse con `get_pull_request_status` |
 
 ---
 

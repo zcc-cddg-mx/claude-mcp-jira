@@ -32,6 +32,7 @@ Actualizar este archivo al completar o añadir tareas.
 - [ ] **Tests live Fase 11** *(bajo — requiere code-agent-mcp corriendo)*
   - Ejecutar `bash scripts/test-code-agent.sh --live` con `CODE_AGENT_URL` apuntando a una instancia del agente
   - Verificar flujo completo: `run_code_agent` → `get_code_agent_status` → `create_azure_pull_request` → `get_pull_request_status`
+  - Nota: code-agent-mcp ahora expone `steps` por paso en `GET /status/<id>` — considerar exponer en `get_code_agent_status` MCP tool
 
 - [ ] **Fase 10 — Workflow Orchestrator** *(siguiente prioridad — prerequisito para UI y worklogs integrados)*
   - Evaluación: `arch/evaluations/eval-workflow-copilot.md` — orquestación implícita detectada como deuda crítica
@@ -40,15 +41,22 @@ Actualizar este archivo al completar o añadir tareas.
   - **Entidad clave**: `WorkflowExecution { id, ticket, status, steps: [...] }` — estado de negocio explícito (no solo `task_status` técnico)
   - **Workflow principal a implementar**: `CreateFeaturePRWorkflow`:
     1. `create_jira_issue` → ZNRX-XXXXX
-    2. `run_code_agent` → task_id (202)
-    3. `wait_until_done(task_id)` → {branch, aux_branch, commit_id}
-    4. `create_azure_pull_request` → {action, pr_id, pr_url}
-    5. `wait_ci(pr_id)` → build verde
-    6. `update_jira` → link PR + transición "In Review"
-    7. `suggest_worklogs` → preview editable (Fase 9.5b)
+    2. `POST /azure/prepare-and-pr/preview` → dry-run: detecta rama base + archivos (endpoint ya existe en code-agent-mcp)
+    3. `run_code_agent` → task_id (202); `steps` tracked: create_branch / commit_push / create_aux_branch
+    4. `wait_until_done(task_id)` → {branch, aux_branch, commit_id, steps}
+    5. `create_azure_pull_request` → {action, pr_id, pr_url}  (idempotente)
+    6. `wait_ci(pr_id)` → build verde
+    7. `PATCH /azure/pull-requests/<pr_id>` → completar PR cuando aprobado (endpoint ya existe)
+    8. `update_jira` → link PR + transición "In Review"
+    9. `suggest_worklogs` → preview editable (Fase 9.5b)
   - **Problema resuelto**: MCP solo decide y llama tools; NO coordina workflows completos directamente
   - **Naming automático**: rama siempre `feature/ZNRX-123-descripcion` + linking PR→Jira automático
+  - **code-agent-mcp ya provee**: detect_base_branch automático, detect_changed_files, pr_store persistente, step tracking
   - **Prerequisito para**: Fase 8 UI (que mostrará progreso por paso) y Fase 9.5b (worklogs post-PR)
+  - **MCP tools candidatos adicionales** (no urgentes — sólo cuando el Orchestrator los necesite):
+    - `preview_code_agent` → `POST /azure/prepare-and-pr/preview` (dry-run antes de ejecutar)
+    - `complete_pull_request` → `PATCH /azure/pull-requests/<pr_id>` (completar PR aprobado)
+    - `list_pull_requests` → `GET /prs` (listar PRs del agente)
 
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — después de Fase 10 Orchestrator; también requiere demanda no-técnica validada)*
   - Evaluación: `arch/evaluations/eval-workflow-copilot.md` sección 5 y `arch/evaluations/eval-orchestrator-copilot.md`

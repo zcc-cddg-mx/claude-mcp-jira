@@ -172,6 +172,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 |---|---|
 | Arquitectura general | `arch/design/architecture-overview.md` |
 | Plan de implementación | `arch/design/implementation-plan.md` |
+| Reporte ejecutivo (para Zurich global) | `arch/reports/executive-report.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
 | MCP server config | `jira_mcp/README.md` |
 | Integración code-agent-mcp (Fases 11-12) + contrato 23 endpoints | `arch/code-agent/integration-plan.md` |

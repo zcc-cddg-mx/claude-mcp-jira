@@ -52,7 +52,7 @@ bash scripts/test-mcp.sh          # e2e MCP server: 10 tests (tools + auth + RBA
 bash scripts/test-multi.sh        # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
 bash scripts/test-actions.sh      # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
 bash scripts/test-git.sh          # e2e Git Intelligence: 26 tests (repos CRUD + sync dry_run)
-bash scripts/test-code-agent.sh   # Fase 11 schema/dispatch: 19 tests (sin requerir code-agent-mcp corriendo)
+bash scripts/test-code-agent.sh   # Fase 10+11 schema/dispatch: 32 tests (sin requerir code-agent-mcp corriendo)
 bash scripts/test-code-agent.sh --live  # live e2e con code-agent-mcp en CODE_AGENT_URL
 pytest tests/                     # tests unitarios: 96 tests (sanitizer, jql, auth, rbac, git_analyzer, git_mapper, jira_pat_routing)
 
@@ -100,6 +100,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `GET` | `/issue-link-types` | Lista tipos de link reales de Jira (cache TTL 1h) |
 | `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, etc.) — 501 |
 | `POST` | `/issues/saz` | Crear ticket SAZ (DevOps/Release); `znrx_key` opcional para vincularlo |
+| `POST` | `/issues/saz/deployment` | Crear SAZ de despliegue desde datos de PR (template determinista, sin Claude); campos: `task`, `repo`, `target`, `branch`, `base_branch`, `pr_id`, `pr_url`, `project_label`, `znrx_key` (opcional) |
 | `GET` | `/projects` | Lista proyectos registrados en DB (seed + auto-descubiertos) |
 | `GET` | `/projects/{key}` | Config de un proyecto; dispara auto-discovery desde Jira si no existe en DB |
 | `GET` | `/health` | Health check |
@@ -194,7 +195,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 4.3 — Transiciones y Log Work | ✅ Completa | `POST /issues/{key}/transition` + `POST /issues/{key}/worklog` |
 | 4.4 — Mejoras API | ✅ Completa | comments, assign, priority, labels, clone; Swagger prod off |
 | 4.5 — Link dinámico | ✅ Completa | `POST /issues/{key}/link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h |
-| 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional |
+| 5 — Soporte SAZ | ✅ Completa | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional; `POST /issues/saz/deployment` (template determinista, título `Despliegue ambiente {ENV} - {PROYECTO} - {TASK}`) |
 | 6 — Observabilidad | Futura | Prometheus + OpenTelemetry + caching — activar cuando el volumen lo justifique |
 | 7 — Multi-proyecto | ✅ Completa | `project` opcional en create/search; SQLite + auto-discovery lazy desde Jira; `GET /projects` |
 | Deuda técnica H1-H9 | ✅ Resuelta | test-actions.sh (24 e2e), auto-link check, rate limit GET públicos, schemas labels, validaciones SAZ/assign/worklog, PROJECT_DB_PATH |
@@ -209,4 +210,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 ## Test tickets (limpieza)
 
 Los tickets de prueba llevan siempre el prefijo `[MCP Claude Jira Test]`.
-JQL para localizar y limpiar: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+JQL para localizar y limpiar:
+- ZNRX: `project = ZNRX AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+- SAZ: `project = SAZ AND summary ~ "[MCP Claude Jira Test]" ORDER BY created DESC`
+
+Los SAZ de despliegue generados por el workflow no llevan el prefijo — eliminarlos manualmente si son de prueba.

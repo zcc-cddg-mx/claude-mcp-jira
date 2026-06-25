@@ -1,7 +1,7 @@
 # Reporte de avances — claude-mcp-jira
 
-**Fecha:** 2026-06-25  
-**Versión del sistema:** 0.5.0  
+**Fecha:** 2026-06-25 (act. 2026-06-25)  
+**Versión del sistema:** 0.5.1  
 **Tests:** 8 + 10 + 19 + 24 + 26 + 32 e2e · 96 unit
 
 ---
@@ -28,7 +28,7 @@
 | 4.3 — Transiciones y Log Work | `POST /transition` + `POST /worklog` | — |
 | 4.4 — Mejoras API | comments, assign, priority, labels, clone; Swagger prod off | 24 e2e |
 | 4.5 — Link dinámico | `POST /link` + `GET /issue-link-types`; tipos reales de Jira, cache TTL 1h | — |
-| 5 — Soporte SAZ | `POST /issues/saz` + MCP `create_saz_request` (lead); `znrx_key` opcional | 8 e2e |
+| 5 — Soporte SAZ | `POST /issues/saz` + `POST /issues/saz/deployment` (template determinista, título `{ENV}-{PROYECTO}-{TASK}`); SAZ independiente o vinculado a ZNRX | 8 e2e |
 | 7 — Multi-proyecto | `project` opcional en create/search; SQLite + auto-discovery lazy; `GET /projects` | 19 e2e |
 | 8a — PAT dinámico | `X-Jira-Token` header opcional; `ContextVar` + `JiraAuthMiddleware`; `pat_source` en audit log | — |
 | 9.1–9.4 — Git Intelligence | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, repo registry SQLite | 26 e2e |
@@ -80,10 +80,16 @@ run_create_feature_pr_workflow(issue_key, repo, repo_path, commit_message)
   → create_pr     POST /azure/prepare-and-pr (idempotente)  → pr_id, pr_url
   → wait_ci       polling /azure/pull-requests/{pr_id}      (max 30 min, 120×15s)
   → update_jira   añade comentario con link PR en el ticket Jira
-  → {execution_id, branch, pr_id, pr_url, build_status, status: "completed"}
+  → create_saz    (opcional) crea SAZ de despliegue vinculado al issue_key
+  → {execution_id, branch, pr_id, pr_url, build_status, saz_key?, status: "completed"}
 ```
 
 Estado persistido en SQLite en cada paso — `get_workflow_status` permite diagnóstico y retry manual.
+
+**SAZ deployment title format:**  
+`Despliegue ambiente {ENV} - {project_label} - {saz_task}`  
+Ejemplo: `Despliegue ambiente TEST - OV - Backend - Relatividades Junio`  
+El campo `saz_task` lo provee el usuario; si omite, se usa el `issue_key` como fallback.
 
 ---
 

@@ -141,7 +141,7 @@ Módulo: `service/git/repo_registry.py` — funciones `init_repo_registry()`, `r
 
 ---
 
-## Tabla `workflow_executions` (Fase 10 — pendiente)
+## Tabla `workflow_executions` (Fase 10 — completa)
 
 Registro de ejecuciones del Workflow Orchestrator. Persiste el estado de negocio de cada orquestación Jira→git→PR.
 
@@ -202,7 +202,7 @@ Las tres tablas se crean al arrancar el service layer (lifespan FastAPI):
 # service/main.py
 init_db()             # crea tabla projects + seed ZNRX/AIPROJECTS/SCRX
 init_repo_registry()  # crea tabla git_repos
-init_workflow_db()    # crea tabla workflow_executions (Fase 10 — pendiente)
+init_workflow_db()    # crea tabla workflow_executions
 ```
 
 La inicialización es idempotente (`CREATE TABLE IF NOT EXISTS`).

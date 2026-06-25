@@ -65,8 +65,9 @@ Núcleo del sistema. Expone una API REST interna y es el único componente que h
 | `/projects/{key}` | GET | Config de un proyecto; dispara auto-discovery si no existe |
 | `/git/sync` | POST | Leer repo Git local → sesiones → worklogs Jira (dry_run por defecto) |
 | `/git/repos` | POST/GET/DELETE | Registro de repos Git (alias → ruta + proyecto Jira) |
-| `/workflows/create-feature-pr` | POST | Crear registro WorkflowExecution pending (Fase 10 — pendiente) |
-| `/workflows/{id}` | GET/PATCH | Consultar o actualizar estado de un workflow (Fase 10 — pendiente) |
+| `/workflows/create-feature-pr` | POST | Crear registro WorkflowExecution `pending`; retorna `execution_id` |
+| `/workflows/{id}` | GET/PATCH | Consultar o actualizar estado de un workflow (steps + result) |
+| `/workflows` | GET | Listar ejecuciones (`?issue_key=`, `?status=`, `?limit=20`) |
 | `/health` | GET | Health check |
 
 Responsabilidades exclusivas del service layer:
@@ -290,13 +291,13 @@ claude-mcp-jira/
 ├── cli/
 │   └── main.py                    # Typer CLI — create, update, summarize, list-issues (--project)
 ├── service/
-│   ├── main.py                    # FastAPI v0.5.0 — lifespan: init_db + init_repo_registry + seed
+│   ├── main.py                    # FastAPI v0.5.0 — lifespan: init_db + init_repo_registry + init_workflow_db + seed
 │   ├── audit.py                   # JSON-lines con request_id + pat_source, rotación 10 MB × 5
 │   ├── middleware/
 │   │   └── jira_auth.py           # JiraAuthMiddleware — extrae X-Jira-Token → ContextVar
 │   ├── routes/                    # issues, update, summarize, search, transitions, worklog,
 │   │                              # comments, assign, priority, labels, clone, link, saz, projects,
-│   │                              # actions, git_sync, git_repos [+ workflows — Fase 10]
+│   │                              # actions, git_sync, git_repos, workflows
 │   ├── schemas/
 │   │   ├── issue.py               # Schemas Request/Payload/Response de tickets
 │   │   └── git_schemas.py         # Schemas Git Intelligence
@@ -313,12 +314,13 @@ claude-mcp-jira/
 │   │   ├── jql_builder.py         # Claude → struct → JQL seguro; project_key opcional
 │   │   ├── project_config.py      # Fachada: get_config(), resolve_project()
 │   │   ├── project_db.py          # SQLite projects: init_db, seed, get_or_discover, list
+│   │   ├── workflow_store.py      # SQLite workflow_executions: CRUD 5 funciones
 │   │   └── rate_limiter.py        # Sliding window por usuario
 │   └── prompts/                   # create, update, summarize, search, transition, log_work,
 │                                  # add_comment, assign, priority, labels, clone, link, saz_create,
 │                                  # git_sync_fallback, git_humanizer
 ├── jira_mcp/
-│   ├── server.py                  # SSE server — 16 herramientas + audit log
+│   ├── server.py                  # SSE server — 15 herramientas + audit log + _run_create_feature_pr_workflow
 │   ├── auth.py                    # API key + IP allowlist
 │   ├── rbac.py                    # Roles dev/lead/system y permisos
 │   ├── service_client.py          # Cliente httpx con output filtrado; _agent_client() independiente
@@ -347,7 +349,7 @@ claude-mcp-jira/
 │   ├── reports/                   # informe técnico MCP
 │   ├── bd/                        # schema SQLite (projects + git_repos + workflow_executions)
 │   ├── code-agent/                # plan de integración Fase 11
-│   └── workflows/                 # diseño Workflow Orchestrator Fase 10
+│   └── workflows/                 # diseño + especificación Workflow Orchestrator Fase 10
 ├── scripts/
 │   ├── dev.sh                     # arranque/stop/restart/status local
 │   ├── test-dev.sh                # 8 tests e2e service layer

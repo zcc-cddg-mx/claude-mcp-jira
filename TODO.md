@@ -1,8 +1,7 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 11 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+19 e2e + 96 unit.
-Próximo: Fase 10 Orchestrator formal (WorkflowEngine + WorkflowExecution state) — prerequisito para UI y worklogs integrados.
-Evaluación externa: `arch/evaluations/eval-workflow-copilot.md` — arquitectura validada como "Internal Developer Copilot Platform"; orquestación implícita detectada como deuda crítica antes de escalar.
+Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 10, 11 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+32 e2e + 96 unit.
+Próximas: Fase 8 UI (condicional a adopción no-técnica) · Fase 6 Observabilidad (condicional a volumen).
 Actualizar este archivo al completar o añadir tareas.
 
 ---
@@ -34,32 +33,7 @@ Actualizar este archivo al completar o añadir tareas.
   - Verificar flujo completo: `run_code_agent` → `get_code_agent_status` → `create_azure_pull_request` → `get_pull_request_status`
   - Nota: code-agent-mcp ahora expone `steps` por paso en `GET /status/<id>` — considerar exponer en `get_code_agent_status` MCP tool
 
-- [ ] **Fase 10 — Workflow Orchestrator** *(siguiente prioridad — prerequisito para UI y worklogs integrados)*
-  - Evaluación: `arch/evaluations/eval-workflow-copilot.md` — orquestación implícita detectada como deuda crítica
-  - **Diseño completo**: `arch/workflows/workflow-orchestrator.md` — especificación de arquitectura, contratos y pasos
-  - **Por qué ahora**: el flujo Jira→git→PR ya existe disperso en MCP + service layer + "scripts mentales"; formalizarlo antes de añadir UI evita acoplamiento y debugging infernal
-  - **Decisiones de diseño**: MCP tool hace el polling; service layer solo persiste estado; entry point es `issue_key` ya existente
-  - **Nuevos archivos a crear**:
-    - `service/clients/workflow_store.py` — SQLite tabla `workflow_executions` (CRUD); patrón: `project_db.py`
-    - `service/schemas/workflow_schemas.py` — `CreateFeaturePRRequest`, `WorkflowExecutionResponse`, `WorkflowUpdateRequest`
-    - `service/routes/workflows.py` — `POST /workflows/create-feature-pr`, `GET /workflows/{id}`, `GET /workflows`, `PATCH /workflows/{id}`
-  - **Archivos a modificar**: `service/main.py` (lifespan + router), `service/routes/__init__.py`, `jira_mcp/server.py`, `jira_mcp/service_client.py`
-  - **Workflow `CreateFeaturePR`** (6 steps — entry point: `issue_key` ya existente):
-    1. `preview` — `POST /azure/prepare-and-pr/preview` → detecta base_branch + files (dry-run)
-    2. `run_agent` — `POST /run` → task_id
-    3. `wait_agent` — polling `GET /status/{task_id}` (max 60 × 5s = 5 min)
-    4. `create_pr` — `POST /azure/prepare-and-pr` (idempotente)
-    5. `wait_ci` — polling `GET /azure/pull-requests/{pr_id}` (max 120 × 15s = 30 min)
-    6. `update_jira` — link PR + comentario + transición "In Review"
-  - **2 MCP tools nuevos**:
-    - `run_create_feature_pr_workflow` (lead) — orquesta los 6 pasos, persiste progreso tras cada uno
-    - `get_workflow_status` (dev) — consulta `WorkflowExecution` por `execution_id`
-  - **Prerequisito para**: Fase 8 UI (progreso por paso) y Fase 9.5b (worklogs post-PR)
-  - **MCP tools candidatos adicionales** (no urgentes — solo cuando el Orchestrator los necesite):
-    - `complete_pull_request` → `PATCH /azure/pull-requests/<pr_id>` (completar PR aprobado)
-    - `list_pull_requests` → `GET /prs` (listar PRs del agente)
-
-- [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — después de Fase 10 Orchestrator; también requiere demanda no-técnica validada)*
+- [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — requiere demanda no-técnica validada)*
   - Evaluación: `arch/evaluations/eval-workflow-copilot.md` sección 5 y `arch/evaluations/eval-orchestrator-copilot.md`
   - **Decisión previa**: ¿hay usuarios no-técnicos que necesiten esto? Sin esa respuesta, no construir
   - UI muestra progreso por paso del WorkflowExecution: 🟡 Creando ticket → 🟡 Ejecutando agent → 🟢 Build OK → ✅ COMPLETADO
@@ -72,7 +46,7 @@ Actualizar este archivo al completar o añadir tareas.
 
 ## Futuros cambios (sin fecha — activar cuando el volumen lo justifique)
 
-- **Fase 9.5b — Human factors + learning layer** *(después de Fase 10 Orchestrator + Fase 8 UI)*
+- **Fase 9.5b — Human factors + learning layer** *(después de Fase 8 UI)*
   - Factores multiplicadores interactivos: debugging (+30%), meetings (+15%), investigación (+25%) — requieren checkbox en UI
   - Learning layer por usuario: `user_factor = avg(user_input / system_estimate)` persistido en SQLite; ajusta estimación futura automáticamente
   - Evaluación: `arch/evaluations/eval-human-sensity-copilot.md` estrategias 2.2 y 2.4 + `arch/evaluations/eval-workflow-copilot.md` sección 6
@@ -187,6 +161,13 @@ Actualizar este archivo al completar o añadir tareas.
   - `scripts/test-code-agent.sh` — 19/19 tests (schema, dispatch, funciones, env vars)
   - `.env.example` — sección `CODE AGENT MCP`: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`, `CODE_AGENT_TIMEOUT`
   - `code-agent-mcp` ya funcional (73 tests, PRs #2552-2554 reales); claude-mcp-jira ahora orquesta flujo completo Jira → git → PR Azure
+- [x] Fase 10 — Workflow Orchestrator (2026-06-25):
+  - `service/clients/workflow_store.py` — SQLite `workflow_executions`, 5 funciones CRUD
+  - `service/schemas/workflow_schemas.py` — `CreateFeaturePRRequest`, `WorkflowExecutionResponse`, `WorkflowStepStatus`, `WorkflowUpdateRequest`
+  - `service/routes/workflows.py` — 4 endpoints REST (POST /create-feature-pr, GET /{id}, GET /, PATCH /{id})
+  - `jira_mcp/server.py` — `_run_create_feature_pr_workflow` async (6 steps + polling) + 2 MCP tools
+  - `jira_mcp/rbac.py` — `run_create_feature_pr_workflow` (lead) + `get_workflow_status` (dev)
+  - `scripts/test-code-agent.sh` — 32/32 tests
 - [x] Fase 8a — PAT dinámico por usuario vía `X-Jira-Token` (2026-06-23):
   - `service/clients/jira_client.py` — `ContextVar _request_pat` + `_get_headers()`; fallback a `JIRA_PAT` env
   - `service/middleware/jira_auth.py` — `JiraAuthMiddleware` extrae header, inyecta ContextVar con `try/finally`

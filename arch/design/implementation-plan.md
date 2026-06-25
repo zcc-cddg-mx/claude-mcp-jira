@@ -692,7 +692,7 @@ Flujo completo validado con PRs #2552–#2554 reales en Azure DevOps Zurich Insu
 
 ---
 
-## Fase 10 — Workflow Orchestrator (pendiente — siguiente prioridad)
+## Fase 10 — Workflow Orchestrator ✅ Completa (2026-06-25)
 
 **Objetivo**: formalizar la orquestación implícita Jira→git→PR en una entidad `WorkflowExecution` persistida en SQLite, con 4 endpoints REST y 2 MCP tools.
 
@@ -706,13 +706,13 @@ Flujo completo validado con PRs #2552–#2554 reales en Azure DevOps Zurich Insu
 - El service layer solo persiste estado (`WorkflowExecution` en SQLite)
 - Entry point es un `issue_key` ya existente (ZNRX-123)
 
-### Nuevos archivos
+### Archivos creados
 
 | Archivo | Responsabilidad |
 |---|---|
-| `service/clients/workflow_store.py` | SQLite tabla `workflow_executions` — CRUD |
-| `service/schemas/workflow_schemas.py` | Pydantic: `CreateFeaturePRRequest`, `WorkflowExecutionResponse` |
-| `service/routes/workflows.py` | `POST /workflows/create-feature-pr`, `GET /workflows/{id}`, `PATCH /workflows/{id}` |
+| `service/clients/workflow_store.py` | SQLite tabla `workflow_executions` — 5 funciones CRUD |
+| `service/schemas/workflow_schemas.py` | Pydantic: `CreateFeaturePRRequest`, `WorkflowExecutionResponse`, `WorkflowStepStatus`, `WorkflowUpdateRequest` |
+| `service/routes/workflows.py` | `POST /create-feature-pr`, `GET /{id}`, `GET /`, `PATCH /{id}` |
 
 ### Workflow `CreateFeaturePR` — 6 steps
 
@@ -721,7 +721,11 @@ Flujo completo validado con PRs #2552–#2554 reales en Azure DevOps Zurich Insu
 3. `wait_agent` — polling `GET /status/{task_id}` (max 60 × 5s = 5 min)
 4. `create_pr` — `POST /azure/prepare-and-pr` (idempotente)
 5. `wait_ci` — polling `GET /azure/pull-requests/{pr_id}` (max 120 × 15s = 30 min)
-6. `update_jira` — link PR + comentario + transición "In Review"
+6. `update_jira` — comentario con link PR en el ticket Jira
+
+### Tests
+
+`scripts/test-code-agent.sh` — 32/32 (7 secciones: schema Fase 11, dispatch, funciones, env vars, schema Fase 10, RBAC, workflow_store).
 
 ### MCP tools nuevos
 

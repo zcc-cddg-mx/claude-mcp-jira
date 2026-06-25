@@ -52,7 +52,7 @@ bash scripts/test-mcp.sh          # e2e MCP server: 10 tests (tools + auth + RBA
 bash scripts/test-multi.sh        # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
 bash scripts/test-actions.sh      # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
 bash scripts/test-git.sh          # e2e Git Intelligence: 26 tests (repos CRUD + sync dry_run)
-bash scripts/test-code-agent.sh   # Fase 10+11 schema/dispatch: 32 tests (sin requerir code-agent-mcp corriendo)
+bash scripts/test-code-agent.sh   # Fase 10+11+12 schema/dispatch: 49 tests (sin requerir code-agent-mcp corriendo)
 bash scripts/test-code-agent.sh --live  # live e2e con code-agent-mcp en CODE_AGENT_URL
 pytest tests/                     # tests unitarios: 96 tests (sanitizer, jql, auth, rbac, git_analyzer, git_mapper, jira_pat_routing)
 
@@ -181,7 +181,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Permisos efectivos del usuario | `docs/jira-roles.md` |
 | Tipos de link Jira | `docs/jira-link-types.md` |
 | Workflows por proyecto | `docs/jira-workflows.md` |
-| Evaluaciones externas | `arch/evaluations/` |
+| Evaluaciones externas | `arch/evaluations/` — estado sistema, Zurich global MCP, Workflow Copilot |
 | Base de datos SQLite | `arch/bd/README.md` |
 | Sub-tasks por proyecto (limitaciones API) | `docs/jira-subtasks.md` |
 
@@ -209,7 +209,8 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere Fase 10 + UI |
 | 10 — Workflow Orchestrator | ✅ Completa | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); 4 REST endpoints + 6-step polling engine; 32 schema tests |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
-| 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; 45/45 schema tests |
+| 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; 49/49 schema tests |
+| Eval — Zurich Global MCP | ✅ Completa | `et-ai-mcp-jira` evaluado: CRUD básico ✅, worklog/link/assign/SAZ ❌; decisión: mantener claude-mcp-jira; ticket referencia ZNRX-68298 |
 
 ## code-agent-mcp — estrategia de integración de endpoints
 

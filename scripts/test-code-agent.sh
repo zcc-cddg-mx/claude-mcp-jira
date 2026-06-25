@@ -264,6 +264,46 @@ else
     FAIL=$((FAIL+1))
 fi
 
+# ─── update_pull_request_status ──────────────────────────────────────────────────
+
+header "Schema: update_pull_request_status en server.py"
+
+if grep -q '"update_pull_request_status"' jira_mcp/server.py; then
+    green "Tool 'update_pull_request_status' definido en server.py"
+    PASS=$((PASS+1))
+else
+    red "Tool 'update_pull_request_status' NO encontrado en server.py"
+    FAIL=$((FAIL+1))
+fi
+
+if grep -q '"abandoned".*"completed".*"active"' jira_mcp/server.py || grep -q '"enum".*abandoned' jira_mcp/server.py; then
+    green "Enum status [abandoned, completed, active] en tool definition"
+    PASS=$((PASS+1))
+else
+    red "Enum status no encontrado en tool definition"
+    FAIL=$((FAIL+1))
+fi
+
+header "service_client.py: update_pull_request_status"
+
+if grep -q "^def update_pull_request_status" jira_mcp/service_client.py; then
+    green "Función 'update_pull_request_status' en service_client.py"
+    PASS=$((PASS+1))
+else
+    red "Función 'update_pull_request_status' NO encontrada en service_client.py"
+    FAIL=$((FAIL+1))
+fi
+
+header "RBAC: update_pull_request_status"
+
+if grep -q "update_pull_request_status" jira_mcp/rbac.py; then
+    green "update_pull_request_status en rbac.py (lead+system)"
+    PASS=$((PASS+1))
+else
+    red "update_pull_request_status NO en rbac.py"
+    FAIL=$((FAIL+1))
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────────
 
 echo ""

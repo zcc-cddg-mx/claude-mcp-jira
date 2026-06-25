@@ -528,7 +528,7 @@ def _make_tools() -> list[Tool]:
                     },
                     "ticket": {
                         "type": "string",
-                        "description": "Jira issue key (e.g. 'ZNRX-68248'). Used in the PR title and to link the SAZ ticket.",
+                        "description": "Ticket or requirement ID used in the PR title (e.g. 'ZNRX-68248' or 'REQ2298577'). If it matches Jira key format (e.g. ZNRX-123) the SAZ is linked to that issue.",
                     },
                     "task": {
                         "type": "string",
@@ -569,6 +569,29 @@ def _make_tools() -> list[Tool]:
                     },
                 },
                 "required": ["repo", "branch_map"],
+            },
+        ),
+        Tool(
+            name="update_pull_request_status",
+            description="Change the status of an Azure DevOps PR: abandoned, completed, or active.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pr_id": {
+                        "type": "integer",
+                        "description": "Azure DevOps PR number",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "Repository name (e.g. 'ov-arizona-backend-ecuador')",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["abandoned", "completed", "active"],
+                        "description": "New PR status",
+                    },
+                },
+                "required": ["pr_id", "repo", "status"],
             },
         ),
     ]
@@ -623,6 +646,8 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
         return {"status": "failed", "error": f"PR creation failed: {e}"}
 
     # Step 3 — create SAZ deployment ticket (best-effort)
+    import re as _re
+    _jira_key = ticket if _re.match(r'^[A-Z][A-Z0-9]+-\d+$', ticket) else None
     try:
         saz_result = service_client.create_deployment_saz(
             task=task,
@@ -633,7 +658,7 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
             pr_id=pr_id,
             pr_url=pr_url,
             user=user,
-            znrx_key=ticket,
+            znrx_key=_jira_key,
             project_label=project_label,
             jira_token=jira_token,
         )
@@ -908,6 +933,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
         elif name == "get_pull_request_status":
             result = service_client.get_pull_request_status(arguments["pr_id"], arguments["repo"])
+        elif name == "update_pull_request_status":
+            result = service_client.update_pull_request_status(arguments["pr_id"], arguments["repo"], arguments["status"])
         elif name == "run_create_feature_pr_workflow":
             result = await _run_create_feature_pr_workflow(arguments, user, jira_token)
         elif name == "get_workflow_status":

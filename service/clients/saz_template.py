@@ -72,7 +72,7 @@ def render_deployment_saz(
             .replace("{task}", task)
             .replace("pr_id", str(pr_id))
             .replace("{feature/fix}", branch)
-            .replace("{destino}", base_branch)
+            .replace("{destino}", target)
             .replace("{link_pr_azure}", f"[{pr_link_label}]({pr_url})")
         )
     except FileNotFoundError:
@@ -81,7 +81,7 @@ def render_deployment_saz(
             f"Proyecto: {repo}\n"
             f"PR-1: {pr_id}\n"
             f"Origen: {branch}\n"
-            f"Destino: {base_branch}\n"
+            f"Destino: {target}\n"
             f"> [{pr_link_label}]({pr_url})"
         )
 

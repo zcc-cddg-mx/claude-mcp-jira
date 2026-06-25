@@ -284,6 +284,15 @@ def get_pull_request_status(pr_id: int, repo: str) -> dict:
         }
 
 
+def update_pull_request_status(pr_id: int, repo: str, status: str) -> dict:
+    """Change PR status: abandoned | completed | active."""
+    with _agent_client() as c:
+        r = c.patch(f"/azure/pull-requests/{pr_id}", json={"status": status, "repo": repo})
+        r.raise_for_status()
+        d = r.json()
+        return {"pr_id": d["pr_id"], "status": d["status"], "pr_url": d.get("pr_url")}
+
+
 def create_deployment_saz(
     task: str,
     repo: str,

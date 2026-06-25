@@ -214,7 +214,7 @@ fi
 
 header "service_client.py: funciones deployment SAZ workflow"
 
-for fn in get_repo_by_alias get_base_branch_for_target; do
+for fn in get_repo_by_alias set_repo_branch_map; do
     if grep -q "^def $fn" jira_mcp/service_client.py; then
         green "Función '$fn' en service_client.py"
         PASS=$((PASS+1))
@@ -242,13 +242,25 @@ else
     FAIL=$((FAIL+1))
 fi
 
-header "RBAC: create_deployment_saz_workflow"
+header "RBAC: create_deployment_saz_workflow + set_repo_branch_map"
 
-if grep -q "create_deployment_saz_workflow" jira_mcp/rbac.py; then
-    green "create_deployment_saz_workflow en rbac.py (lead+system)"
+for tool in create_deployment_saz_workflow set_repo_branch_map; do
+    if grep -q "$tool" jira_mcp/rbac.py; then
+        green "$tool en rbac.py (lead+system)"
+        PASS=$((PASS+1))
+    else
+        red "$tool NO en rbac.py"
+        FAIL=$((FAIL+1))
+    fi
+done
+
+header "Schema: set_repo_branch_map en server.py"
+
+if grep -q '"set_repo_branch_map"' jira_mcp/server.py; then
+    green "Tool 'set_repo_branch_map' definido en server.py"
     PASS=$((PASS+1))
 else
-    red "create_deployment_saz_workflow NO en rbac.py"
+    red "Tool 'set_repo_branch_map' NO encontrado en server.py"
     FAIL=$((FAIL+1))
 fi
 

@@ -261,10 +261,12 @@ def create_azure_pull_request(
         d = r.json()
         pr = d.get("pr") or {}
         return {
-            "aux_branch": d.get("aux_branch"),
-            "action": d.get("action"),
-            "pr_id": pr.get("pr_id"),
-            "pr_url": pr.get("pr_url"),
+            "aux_branch":  d.get("aux_branch"),
+            "action":      d.get("action"),
+            "pr_id":       pr.get("pr_id"),
+            "pr_url":      pr.get("pr_url"),
+            "base_branch": d.get("base_branch"),
+            "real_target": d.get("real_target"),
         }
 
 
@@ -396,6 +398,12 @@ def get_repo_by_alias(alias: str, user: str) -> dict:
         return d
 
 
-def get_base_branch_for_target(target: str) -> str:
-    from service.clients.saz_template import get_base_branch_for_target as _impl
-    return _impl(target)
+def set_repo_branch_map(repo_name: str, branch_map: dict) -> dict:
+    """Set per-repo target→branch mapping in code-agent-mcp registry.
+    Calls PATCH /repos/<name>/branch-map on code-agent-mcp.
+    branch_map example: {"developer": "developer", "test": "test", "prod": "develop"}
+    """
+    with _agent_client() as c:
+        r = c.patch(f"/repos/{repo_name}/branch-map", json=branch_map)
+        r.raise_for_status()
+        return r.json()

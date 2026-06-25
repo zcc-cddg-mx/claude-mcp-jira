@@ -548,6 +548,29 @@ def _make_tools() -> list[Tool]:
                 "required": ["repo", "branch", "target", "ticket", "task"],
             },
         ),
+        Tool(
+            name="set_repo_branch_map",
+            description=(
+                "Configure the target→branch mapping for a repo in code-agent-mcp. "
+                "E.g. {\"developer\": \"developer\", \"test\": \"test\", \"prod\": \"develop\"}. "
+                "This overrides the global default for that specific repo."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repo name in code-agent-mcp registry (e.g. 'ov-arizona-backend-ecuador')",
+                    },
+                    "branch_map": {
+                        "type": "object",
+                        "description": "Mapping of logical target names to real branch names. Keys: developer, test, prod. Values: actual branch names in the repo.",
+                        "additionalProperties": {"type": "string"},
+                    },
+                },
+                "required": ["repo", "branch_map"],
+            },
+        ),
     ]
 
 
@@ -577,12 +600,11 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
     except Exception as e:
         return {"status": "failed", "error": f"Repo '{repo_alias}' not found in registry: {e}"}
 
-    # Step 2 — resolve base_branch from target
-    base_branch = service_client.get_base_branch_for_target(target)
+    # Step 2 — create PR via code-agent-mcp (idempotent)
+    # base_branch is resolved by code-agent-mcp using per-repo branch_map
     env_upper = target.upper()
     pr_title = f"{ticket} {task} → {env_upper}"
 
-    # Step 3 — create PR via code-agent-mcp (idempotent)
     try:
         pr_result = service_client.create_azure_pull_request(
             repo=repo_name,
@@ -596,10 +618,11 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
         pr_id = pr_result["pr_id"]
         pr_url = pr_result.get("pr_url", "")
         aux_branch = pr_result.get("aux_branch")
+        base_branch = pr_result.get("base_branch") or target
     except Exception as e:
         return {"status": "failed", "error": f"PR creation failed: {e}"}
 
-    # Step 4 — create SAZ deployment ticket (best-effort)
+    # Step 3 — create SAZ deployment ticket (best-effort)
     try:
         saz_result = service_client.create_deployment_saz(
             task=task,
@@ -891,6 +914,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = service_client.get_workflow_status_by_id(arguments["execution_id"], user)
         elif name == "create_deployment_saz_workflow":
             result = await _run_create_deployment_saz_workflow(arguments, user, jira_token)
+        elif name == "set_repo_branch_map":
+            result = service_client.set_repo_branch_map(arguments["repo"], arguments["branch_map"])
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
                 repo_path=arguments.get("repo_path"),

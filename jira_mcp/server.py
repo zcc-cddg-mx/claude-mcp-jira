@@ -502,6 +502,52 @@ def _make_tools() -> list[Tool]:
                 "required": ["execution_id"],
             },
         ),
+        Tool(
+            name="create_deployment_saz_workflow",
+            description=(
+                "Create an Azure PR and a SAZ deployment ticket for an existing feature branch. "
+                "The base branch is determined automatically by the target environment. "
+                "No code commit needed — the branch already has the changes."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Repo alias from the git_repos registry (e.g. 'ov-arizona-backend-ecuador'). The repo_path is resolved automatically.",
+                    },
+                    "branch": {
+                        "type": "string",
+                        "description": "Source branch to create the PR from (e.g. 'feature/ZNRX-68248-workflow')",
+                        "maxLength": 255,
+                    },
+                    "target": {
+                        "type": "string",
+                        "enum": ["developer", "test", "prod"],
+                        "description": "Deployment environment. Determines the base branch: developer→developer, test→test, prod→develop.",
+                    },
+                    "ticket": {
+                        "type": "string",
+                        "description": "Jira issue key (e.g. 'ZNRX-68248'). Used in the PR title and to link the SAZ ticket.",
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "Short task description for the SAZ title (e.g. 'Backend - Relatividades Junio')",
+                        "maxLength": 120,
+                    },
+                    "project_label": {
+                        "type": "string",
+                        "description": "Project label in the SAZ title (default: OV)",
+                        "default": "OV",
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user.",
+                    },
+                },
+                "required": ["repo", "branch", "target", "ticket", "task"],
+            },
+        ),
     ]
 
 
@@ -513,6 +559,77 @@ _CI_POLL_MAX = int(os.environ.get("WORKFLOW_CI_POLL_MAX", "120"))
 
 def _step(name: str, status: str, detail: str | None = None) -> dict:
     return {"name": name, "status": status, "detail": detail}
+
+
+async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_token: str | None) -> dict:
+    repo_alias = arguments["repo"]
+    branch = arguments["branch"]
+    target = arguments["target"]
+    ticket = arguments["ticket"]
+    task = arguments["task"]
+    project_label = arguments.get("project_label", "OV")
+
+    # Step 1 — resolve repo_path from registry
+    try:
+        repo_entry = service_client.get_repo_by_alias(repo_alias, user)
+        repo_name = repo_entry["name"]
+        repo_path = repo_entry["repo_path"]
+    except Exception as e:
+        return {"status": "failed", "error": f"Repo '{repo_alias}' not found in registry: {e}"}
+
+    # Step 2 — resolve base_branch from target
+    base_branch = service_client.get_base_branch_for_target(target)
+    env_upper = target.upper()
+    pr_title = f"{ticket} {task} → {env_upper}"
+
+    # Step 3 — create PR via code-agent-mcp (idempotent)
+    try:
+        pr_result = service_client.create_azure_pull_request(
+            repo=repo_name,
+            repo_path=repo_path,
+            branch=branch,
+            files=[],
+            target=target,
+            ticket=ticket,
+            title=pr_title,
+        )
+        pr_id = pr_result["pr_id"]
+        pr_url = pr_result.get("pr_url", "")
+        aux_branch = pr_result.get("aux_branch")
+    except Exception as e:
+        return {"status": "failed", "error": f"PR creation failed: {e}"}
+
+    # Step 4 — create SAZ deployment ticket (best-effort)
+    try:
+        saz_result = service_client.create_deployment_saz(
+            task=task,
+            repo=repo_name,
+            target=target,
+            branch=branch,
+            base_branch=base_branch,
+            pr_id=pr_id,
+            pr_url=pr_url,
+            user=user,
+            znrx_key=ticket,
+            project_label=project_label,
+            jira_token=jira_token,
+        )
+        return {
+            "status": "success",
+            "pr_id": pr_id,
+            "pr_url": pr_url,
+            "aux_branch": aux_branch,
+            "saz_key": saz_result.get("saz_key"),
+            "summary": saz_result.get("summary"),
+        }
+    except Exception as e:
+        return {
+            "status": "partial_failure",
+            "pr_id": pr_id,
+            "pr_url": pr_url,
+            "aux_branch": aux_branch,
+            "error": f"SAZ creation failed: {e}",
+        }
 
 
 async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token: str | None) -> dict:
@@ -772,6 +889,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             result = await _run_create_feature_pr_workflow(arguments, user, jira_token)
         elif name == "get_workflow_status":
             result = service_client.get_workflow_status_by_id(arguments["execution_id"], user)
+        elif name == "create_deployment_saz_workflow":
+            result = await _run_create_deployment_saz_workflow(arguments, user, jira_token)
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
                 repo_path=arguments.get("repo_path"),

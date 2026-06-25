@@ -192,6 +192,66 @@ for fn in init_workflow_db create_execution update_execution get_execution list_
     fi
 done
 
+# ─── Deployment SAZ workflow (Fase 12) ───────────────────────────────────────────
+
+header "Schema: create_deployment_saz_workflow en server.py"
+
+if grep -q '"create_deployment_saz_workflow"' jira_mcp/server.py; then
+    green "Tool 'create_deployment_saz_workflow' definido en server.py"
+    PASS=$((PASS+1))
+else
+    red "Tool 'create_deployment_saz_workflow' NO encontrado en server.py"
+    FAIL=$((FAIL+1))
+fi
+
+if grep -q "\"developer\", \"test\", \"prod\"" jira_mcp/server.py || grep -q '"enum".*developer.*test.*prod' jira_mcp/server.py; then
+    green "Enum target [developer, test, prod] en tool definition"
+    PASS=$((PASS+1))
+else
+    red "Enum target no encontrado en tool definition"
+    FAIL=$((FAIL+1))
+fi
+
+header "service_client.py: funciones deployment SAZ workflow"
+
+for fn in get_repo_by_alias get_base_branch_for_target; do
+    if grep -q "^def $fn" jira_mcp/service_client.py; then
+        green "Función '$fn' en service_client.py"
+        PASS=$((PASS+1))
+    else
+        red "Función '$fn' NO encontrada en service_client.py"
+        FAIL=$((FAIL+1))
+    fi
+done
+
+header "saz_template.py: mapping target→base_branch"
+
+if grep -q "_TARGET_BASE_BRANCH" service/clients/saz_template.py; then
+    green "_TARGET_BASE_BRANCH dict en saz_template.py"
+    PASS=$((PASS+1))
+else
+    red "_TARGET_BASE_BRANCH NO encontrado en saz_template.py"
+    FAIL=$((FAIL+1))
+fi
+
+if grep -q "^def get_base_branch_for_target" service/clients/saz_template.py; then
+    green "Función 'get_base_branch_for_target' en saz_template.py"
+    PASS=$((PASS+1))
+else
+    red "Función 'get_base_branch_for_target' NO encontrada"
+    FAIL=$((FAIL+1))
+fi
+
+header "RBAC: create_deployment_saz_workflow"
+
+if grep -q "create_deployment_saz_workflow" jira_mcp/rbac.py; then
+    green "create_deployment_saz_workflow en rbac.py (lead+system)"
+    PASS=$((PASS+1))
+else
+    red "create_deployment_saz_workflow NO en rbac.py"
+    FAIL=$((FAIL+1))
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────────
 
 echo ""

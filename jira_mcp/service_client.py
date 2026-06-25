@@ -383,3 +383,19 @@ def update_workflow(
         r = c.patch(f"/workflows/{execution_id}", json=body)
         r.raise_for_status()
         return r.json()
+
+
+# ─── Deployment SAZ workflow helpers ─────────────────────────────────────────
+
+def get_repo_by_alias(alias: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.get(f"/git/repos/{alias}")
+        r.raise_for_status()
+        d = r.json()
+        _require(d, "name", "repo_path", endpoint=f"GET /git/repos/{alias}")
+        return d
+
+
+def get_base_branch_for_target(target: str) -> str:
+    from service.clients.saz_template import get_base_branch_for_target as _impl
+    return _impl(target)

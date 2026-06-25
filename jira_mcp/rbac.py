@@ -3,8 +3,8 @@ from typing import Optional
 
 ROLES: dict[str, list[str]] = {
     "dev":    ["create_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "link_jira_issues", "sync_git_worklogs", "register_git_repo", "list_git_repos", "get_code_agent_status", "get_pull_request_status", "get_workflow_status"],
-    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs", "register_git_repo", "list_git_repos", "run_code_agent", "get_code_agent_status", "create_azure_pull_request", "get_pull_request_status", "run_create_feature_pr_workflow", "get_workflow_status"],
-    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs", "register_git_repo", "list_git_repos", "run_code_agent", "get_code_agent_status", "create_azure_pull_request", "get_pull_request_status", "run_create_feature_pr_workflow", "get_workflow_status"],
+    "lead":   ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs", "register_git_repo", "list_git_repos", "run_code_agent", "get_code_agent_status", "create_azure_pull_request", "get_pull_request_status", "run_create_feature_pr_workflow", "get_workflow_status", "create_deployment_saz_workflow"],
+    "system": ["create_jira_issue", "update_jira_issue", "get_jira_issue", "search_jira_issues", "add_comment_jira_issue", "assign_jira_issue", "set_priority_jira_issue", "link_jira_issues", "create_saz_request", "sync_git_worklogs", "register_git_repo", "list_git_repos", "run_code_agent", "get_code_agent_status", "create_azure_pull_request", "get_pull_request_status", "run_create_feature_pr_workflow", "get_workflow_status", "create_deployment_saz_workflow"],
 }
 
 # Map API key → role. Format: "key1:role1,key2:role2"

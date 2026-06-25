@@ -20,6 +20,20 @@ _ENV_LABELS = {
     "main":      "PROD",
 }
 
+# Maps deployment target → base branch of the PR
+# developer → developer branch (desarrollo)
+# test      → test branch (pruebas)
+# prod      → develop (DevOps promotes develop→main manually)
+_TARGET_BASE_BRANCH = {
+    "developer": "developer",
+    "test":      "test",
+    "prod":      "develop",
+}
+
+
+def get_base_branch_for_target(target: str) -> str:
+    return _TARGET_BASE_BRANCH.get(target.lower(), target)
+
 
 def _env_label(target: str) -> str:
     return _ENV_LABELS.get(target.lower(), target.upper())

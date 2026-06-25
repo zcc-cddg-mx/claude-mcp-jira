@@ -10,9 +10,9 @@ genérica del code-agent original y descartando toda lógica específica del dom
 
 ---
 
-## Estado actual del `code-agent-mcp` (2026-06-24)
+## Estado actual del `code-agent-mcp` (2026-06-25)
 
-**133 tests.** Funcional e2e contra Azure DevOps (Zurich Insurance Ecuador) — PRs #2552–#2554 reales creados.
+**133 tests.** Funcional e2e contra Azure DevOps (Zurich Insurance Ecuador) — PRs #2552–#2575 reales creados.
 
 ### Módulos implementados
 
@@ -30,31 +30,64 @@ genérica del code-agent original y descartando toda lógica específica del dom
 | `src/azure_client.py` | Azure DevOps REST API v7.1: crear PR, buscar PR existente, completar/abandonar PR, estado PR + build |
 | `src/logger.py` | Log estructurado |
 
-### API surface completa (22 endpoints)
+### API surface completa (23 endpoints)
 
-| Método | Path | Descripción |
-|---|---|---|
-| `GET` | `/health` | Liveness (sin token) |
-| `POST` | `/run` | Encolar tarea git → 202 inmediato; `steps` tracked internamente |
-| `GET` | `/status/<task_id>` | Estado de la tarea + `steps` por paso (create_branch/commit_push/create_aux_branch) |
-| `GET` | `/tasks` | Últimas N tareas; `?ticket=` filtra por ticket |
-| `GET` | `/config/branches` | Ver diccionario de ramas (desde SQLite) |
-| `PUT` | `/config/branches` | Actualizar diccionario (persiste en SQLite, hot-reload) |
-| `POST` | `/repos` | Registrar repo + inspección inmediata; 403 para repos no registrados en operaciones git |
-| `GET` | `/repos` | Listar repos |
-| `GET` | `/repos/<name>` | Repo por nombre (incluye `branch_roles` + `branches_by_role`) |
-| `POST` | `/repos/<name>/refresh` | Re-inspeccionar repo |
-| `DELETE` | `/repos/<name>` | Eliminar del registro |
-| `PATCH` | `/repos/<name>/branches/<branch>` | Corregir rol de una rama (sin re-inspeccionar) |
-| `GET` | `/projects` | Listar proyectos con sus repos |
-| `GET` | `/projects/<org>/<name>` | Proyecto por slug |
-| `POST` | `/azure/prepare-and-pr/preview` | **Dry-run:** detecta rama base y archivos sin efectos; devuelve `existing_pr` si ya hay PR |
-| `POST` | `/azure/prepare-and-pr` | **Endpoint principal** — idempotente: ensure aux branch + find-or-create PR aux |
-| `POST` | `/azure/pull-requests` | Crear feature PR + aux PR simultáneos (legacy) |
-| `GET` | `/azure/pull-requests/<pr_id>` | Estado del PR + build CI |
-| `PATCH` | `/azure/pull-requests/<pr_id>` | Completar / abandonar / reactivar PR |
-| `GET` | `/prs` | Lista PRs persistidos en `pr_store`; `?repo=`, `?status=`, `?task_id=`, `?limit=` |
-| `GET` | `/prs/<pr_id>` | PR individual con estado refrescado desde Azure DevOps |
+#### Sistema
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/health` | ❌ libre | Liveness check |
+
+#### Tareas git (asíncronas)
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/run` | ✅ | Encolar tarea git (branch + commit + push + aux branch) → 202 inmediato; body: `repo`, `branch`, `files` (non-empty list), `ticket`, `commit_message`, `base_branch?`, `target?`, `callback_url?` |
+| `GET` | `/status/<task_id>` | ✅ | Estado + `steps` (create_branch / commit_push / create_aux_branch); status: queued / running / done / error / rejected |
+| `GET` | `/tasks` | ✅ | Últimas N tareas (default 50, max 200); `?ticket=` filtra por ticket |
+
+#### Configuración de ramas (global)
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/config/branches` | ✅ | Ver diccionario global de ramas desde SQLite |
+| `PUT` | `/config/branches` | ✅ | Reemplazar / actualizar diccionario de ramas (persiste, hot-reload); body: `{branch_name: {label, environment, url?, is_base?}}` |
+
+#### Repositorios
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/repos` | ✅ | Registrar repo: inspección via Azure API + git ls-remote; body: `git_url` (req), `local_path?`; 409 si ya existe |
+| `GET` | `/repos` | ✅ | Listar todos los repos registrados |
+| `GET` | `/repos/<name>` | ✅ | Repo por nombre; incluye `branch_roles` + `branches_by_role` (invertido) + `branch_map` |
+| `PATCH` | `/repos/<name>/branches/<branch>` | ✅ | Asignar rol de una rama: body `{role: base\|integration\|feature\|other}` |
+| `PATCH` | `/repos/<name>/branch-map` | ✅ | Mapping target→branch por repo: body `{developer: "developer", test: "test", prod: "develop"}`; sobreescribe resolución global para ese repo |
+| `POST` | `/repos/<name>/refresh` | ✅ | Re-inspeccionar repo (re-clasifica ramas desde Azure + git ls-remote) |
+| `DELETE` | `/repos/<name>` | ✅ | Eliminar repo del registro |
+
+#### Proyectos Azure DevOps
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/projects` | ✅ | Listar proyectos con lista de repos por proyecto |
+| `GET` | `/projects/<org>/<name>` | ✅ | Proyecto por slug `{org}/{name}` con repos |
+
+#### Pull Requests — Azure DevOps
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/azure/prepare-and-pr/preview` | ✅ | **Dry-run:** detecta `base_branch` + archivos cambiados + `aux_branch` + `existing_pr` sin crear nada; body: `repo`, `branch`, `target` (req), `repo_path?`, `files?`, `base_branch?` |
+| `POST` | `/azure/prepare-and-pr` | ✅ | **Principal (idempotente):** ensure aux branch → find-or-create PR auxiliar; body: `repo`, `branch`, `target`, `ticket`, `title` (req), `repo_path?`, `files?`, `base_branch?`, `description?`; retorna 200 (existente) o 201 (nuevo) |
+| `POST` | `/azure/pull-requests` | ✅ | Legacy: crear feature PR + aux PR simultáneos; body: `branch`, `aux_branch`, `title`, `repo` (req), `description?`, `target?` |
+| `GET` | `/azure/pull-requests/<pr_id>` | ✅ | Estado PR + build CI; query: `repo` (req si no hay AZURE_REPO); retorna `{pr_id, status, build_status, pr_url}` |
+| `PATCH` | `/azure/pull-requests/<pr_id>` | ✅ | Cambiar estado PR; body: `repo` (req), `status: completed\|abandoned\|active`; actualiza `pr_store` local |
+
+#### Pull Requests — Registro local (pr_store)
+
+| Método | Path | Auth | Descripción |
+|---|---|---|---|
+| `GET` | `/prs` | ✅ | Listar PRs del registro local; `?repo=`, `?status=`, `?task_id=`, `?limit=` (default 50) |
+| `GET` | `/prs/<pr_id>` | ✅ | PR del registro con estado refrescado desde Azure; si no está en registry, devuelve datos live sin persistir |
 
 ### Git flow implementado
 
@@ -92,26 +125,35 @@ genérica del code-agent original y descartando toda lógica específica del dom
 
 ---
 
-## Pipeline objetivo (claude-mcp-jira como orquestador)
+## Pipelines disponibles
 
-```
-Claude Code (MCP tools)
-  → claude-mcp-jira
-    → Jira          (create, update, transition, comment)
-    → code-agent-mcp (run_code_agent, get_code_agent_status)
-    → Azure DevOps   (create_azure_pull_request, get_pull_request_status)
-    → Jira           (link PR + transición "In Review")
-```
-
-Flujo completo desde Claude Code (Fase 11 — implementado):
+### Flujo feature completo (Fase 11 — `run_create_feature_pr_workflow`)
 
 ```
 1. create_jira_issue           → ZNRX-XXXXX
-2. run_code_agent              → task_id  (202 inmediato)
-3. get_code_agent_status       → polling → "done" → {branch, aux_branch, commit_id, steps}
-4. create_azure_pull_request   → {action, pr_id, pr_url}  (idempotente via prepare-and-pr)
-5. get_pull_request_status     → esperar build verde
-6. update_jira_issue           → link PR + transición "In Review"
+2. run_code_agent              → task_id  (202 inmediato; commit + push en background)
+3. get_code_agent_status       → polling → "done" → {branch, aux_branch, commit_id}
+4. create_azure_pull_request   → {pr_id, pr_url}  (idempotente; aux branch → integration)
+5. get_pull_request_status     → polling → build verde
+6. update_jira_issue           → comentario con link PR + transición "In Review"
+```
+
+### Flujo despliegue (Fase 12 — `create_deployment_saz_workflow`)
+
+```
+[rama ya tiene cambios — no se necesita commit]
+1. get_repo_by_alias           → repo_path desde registry claude-mcp-jira
+2. create_azure_pull_request   → PR aux (feature/REQ → developer|test|develop)
+3. create_deployment_saz       → SAZ Jira con datos del PR (template determinista)
+   retorna → {pr_id, pr_url, aux_branch, saz_key, summary}
+```
+
+### Ciclo de vida de PR (Fase 12 — `update_pull_request_status`)
+
+```
+update_pull_request_status(pr_id, repo, "abandoned")  → DevOps cierra sin merge
+update_pull_request_status(pr_id, repo, "completed")  → DevOps completa/merge
+update_pull_request_status(pr_id, repo, "active")     → DevOps reactiva PR cerrado
 ```
 
 ---
@@ -128,7 +170,7 @@ CODE_AGENT_TOKEN=                         # mismo valor que TOKEN_AZURE del agen
 CODE_AGENT_TIMEOUT=30
 ```
 
-### MCP tools implementados en `jira_mcp/server.py`
+### MCP tools implementados en `jira_mcp/server.py` (Fases 11 + 12)
 
 | Tool | Rol mínimo | Endpoint que llama | Descripción |
 |---|---|---|---|
@@ -136,15 +178,20 @@ CODE_AGENT_TIMEOUT=30
 | `get_code_agent_status` | dev | `GET /status/<task_id>` | Estado + steps + branch + commit_id |
 | `create_azure_pull_request` | lead | `POST /azure/prepare-and-pr` | Idempotente: ensure aux + find-or-create PR |
 | `get_pull_request_status` | dev | `GET /azure/pull-requests/<pr_id>` | Estado PR + build CI |
+| `update_pull_request_status` | lead | `PATCH /azure/pull-requests/<pr_id>` | Cambiar estado PR: abandoned / completed / active |
+| `create_deployment_saz_workflow` | lead | `POST /azure/prepare-and-pr` + service layer | Workflow sincrónico: resolve repo → PR → SAZ |
+| `set_repo_branch_map` | lead | `PATCH /repos/<name>/branch-map` | Configura mapping target→branch por repo |
 
 ### Endpoints del agente no expuestos como MCP tools (aún)
 
 | Endpoint | Descripción | Candidato para |
 |---|---|---|
-| `POST /azure/prepare-and-pr/preview` | Dry-run antes de crear PR | Fase 10 Orchestrator (paso previo) |
-| `PATCH /azure/pull-requests/<pr_id>` | Completar / abandonar PR | Futuro MCP tool `complete_pull_request` |
-| `GET /prs` | Listar PRs registrados | Futuro MCP tool `list_pull_requests` |
-| `GET /prs/<pr_id>` | PR con estado refrescado | Puede unificarse con `get_pull_request_status` |
+| `POST /azure/prepare-and-pr/preview` | Dry-run antes de crear PR | Usado internamente en `run_create_feature_pr_workflow` |
+| `POST /azure/pull-requests` | Crear feature + aux PR (legacy) | Sin uso activo — reemplazado por `prepare-and-pr` |
+| `GET /prs` | Listar PRs del registro local | Futuro MCP tool `list_pull_requests` |
+| `GET /prs/<pr_id>` | PR individual con estado refrescado | Puede unificarse con `get_pull_request_status` |
+| `POST /repos` | Registrar repo | Administración manual vía Swagger — no exponer como MCP |
+| `PUT /config/branches` | Actualizar diccionario global de ramas | Administración manual vía Swagger |
 
 ---
 

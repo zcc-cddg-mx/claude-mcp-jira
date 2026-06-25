@@ -279,3 +279,76 @@ def get_pull_request_status(pr_id: int, repo: str) -> dict:
             "build_status": d["build_status"],
             "pr_url": d.get("pr_url"),
         }
+
+
+def preview_code_agent(
+    repo: str,
+    repo_path: str,
+    target: str = "developer",
+    files: Optional[list] = None,
+) -> dict:
+    body: dict = {"repo": repo, "repo_path": repo_path, "target": target, "files": files or []}
+    with _agent_client() as c:
+        r = c.post("/azure/prepare-and-pr/preview", json=body)
+        r.raise_for_status()
+        d = r.json()
+        return {
+            "base_branch": d.get("base_branch"),
+            "files_detected": d.get("files_detected", []),
+        }
+
+
+# ─── Workflow Orchestrator (Fase 10) ─────────────────────────────────────────
+
+def create_workflow(
+    issue_key: str,
+    repo: str,
+    repo_path: str,
+    target: str,
+    commit_message: str,
+    files: list,
+    user: str,
+    jira_token: Optional[str] = None,
+) -> dict:
+    body = {
+        "issue_key": issue_key,
+        "repo": repo,
+        "repo_path": repo_path,
+        "target": target,
+        "commit_message": commit_message,
+        "files": files,
+    }
+    with _client(user, jira_token) as c:
+        r = c.post("/workflows/create-feature-pr", json=body)
+        r.raise_for_status()
+        return r.json()
+
+
+def get_workflow_status_by_id(execution_id: str, user: str) -> dict:
+    with _client(user) as c:
+        r = c.get(f"/workflows/{execution_id}")
+        r.raise_for_status()
+        return r.json()
+
+
+def update_workflow(
+    execution_id: str,
+    user: str,
+    status: Optional[str] = None,
+    steps: Optional[list] = None,
+    result: Optional[dict] = None,
+    error: Optional[str] = None,
+) -> dict:
+    body: dict = {}
+    if status is not None:
+        body["status"] = status
+    if steps is not None:
+        body["steps"] = steps
+    if result is not None:
+        body["result"] = result
+    if error is not None:
+        body["error"] = error
+    with _client(user) as c:
+        r = c.patch(f"/workflows/{execution_id}", json=body)
+        r.raise_for_status()
+        return r.json()

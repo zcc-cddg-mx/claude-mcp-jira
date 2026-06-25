@@ -48,14 +48,14 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 
 **Requisito**: `code-agent-mcp` corriendo en `CODE_AGENT_URL` (default `http://code-agent-mcp:5001`). Ver `arch/code-agent/integration-plan.md`.
 
-### Workflow Orchestrator (Fase 10 — pendiente)
+### Workflow Orchestrator (Fase 10 — completa)
 
 | Herramienta | Rol mínimo | Descripción |
 |---|---|---|
 | `run_create_feature_pr_workflow` | lead | Ejecuta el workflow completo en un solo tool: preview → git → PR → CI → link Jira. Persiste progreso paso a paso. Retorna `execution_id` + estado final. |
 | `get_workflow_status` | dev | Consulta estado de una `WorkflowExecution` por `execution_id` (útil para diagnóstico o retry manual). |
 
-**Flujo unificado (Fase 10 — un solo tool):**
+**Flujo unificado:**
 ```
 run_create_feature_pr_workflow(issue_key, repo, repo_path, commit_message)
   → preview       detecta base_branch + files (dry-run)

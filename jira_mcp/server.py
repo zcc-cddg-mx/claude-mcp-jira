@@ -431,7 +431,200 @@ def _make_tools() -> list[Tool]:
                 "required": ["pr_id", "repo"],
             },
         ),
+        Tool(
+            name="run_create_feature_pr_workflow",
+            description=(
+                "Run the full CreateFeaturePR workflow: preview → git agent → PR → CI wait → link Jira. "
+                "Executes all steps sequentially and returns the final execution state with branch, pr_id and pr_url."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "issue_key": {
+                        "type": "string",
+                        "description": "Existing Jira ticket key (e.g. ZNRX-123). The ticket must already exist.",
+                    },
+                    "repo": {
+                        "type": "string",
+                        "description": "Azure DevOps repository name (e.g. ov-arizona-backend-ecuador)",
+                    },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Absolute path to the repo on the code-agent server (e.g. /repos/ov-arizona-backend-ecuador)",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Integration branch to target (default: developer)",
+                    },
+                    "commit_message": {
+                        "type": "string",
+                        "description": "Commit message for the feature branch",
+                        "maxLength": 500,
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files to stage. Leave empty to auto-detect via preview dry-run.",
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user.",
+                    },
+                },
+                "required": ["issue_key", "repo", "repo_path", "commit_message"],
+            },
+        ),
+        Tool(
+            name="get_workflow_status",
+            description="Get the current state of a workflow execution (steps, result, error).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "execution_id": {
+                        "type": "string",
+                        "description": "Workflow execution ID returned by run_create_feature_pr_workflow",
+                    },
+                },
+                "required": ["execution_id"],
+            },
+        ),
     ]
+
+
+_AGENT_POLL_INTERVAL = int(os.environ.get("WORKFLOW_AGENT_POLL_INTERVAL", "5"))
+_AGENT_POLL_MAX = int(os.environ.get("WORKFLOW_AGENT_POLL_MAX", "60"))
+_CI_POLL_INTERVAL = int(os.environ.get("WORKFLOW_CI_POLL_INTERVAL", "15"))
+_CI_POLL_MAX = int(os.environ.get("WORKFLOW_CI_POLL_MAX", "120"))
+
+
+def _step(name: str, status: str, detail: str | None = None) -> dict:
+    return {"name": name, "status": status, "detail": detail}
+
+
+async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token: str | None) -> dict:
+    issue_key = arguments["issue_key"]
+    repo = arguments["repo"]
+    repo_path = arguments["repo_path"]
+    target = arguments.get("target", "developer")
+    commit_message = arguments["commit_message"]
+    files = arguments.get("files") or []
+
+    # Step 0 — create execution record
+    execution = service_client.create_workflow(
+        issue_key=issue_key,
+        repo=repo,
+        repo_path=repo_path,
+        target=target,
+        commit_message=commit_message,
+        files=files,
+        user=user,
+        jira_token=jira_token,
+    )
+    eid = execution["execution_id"]
+    steps: list[dict] = []
+
+    def _persist(status: str | None = None, error: str | None = None) -> None:
+        service_client.update_workflow(eid, user, status=status, steps=steps, error=error)
+
+    service_client.update_workflow(eid, user, status="running", steps=steps)
+
+    try:
+        # Step 1 — preview (dry-run: detect base_branch + files)
+        steps.append(_step("preview", "running"))
+        _persist()
+        preview = service_client.preview_code_agent(
+            repo=repo, repo_path=repo_path, target=target, files=files
+        )
+        if not files:
+            files = preview.get("files_detected", [])
+        base_branch = preview.get("base_branch")
+        steps[-1] = _step("preview", "done", f"base={base_branch} files={len(files)}")
+        _persist()
+
+        # Step 2 — run agent (async 202)
+        steps.append(_step("run_agent", "running"))
+        _persist()
+        branch = f"feature/{issue_key}-workflow"
+        agent_run = service_client.run_code_agent(
+            repo=repo,
+            branch=branch,
+            files=files,
+            ticket=issue_key,
+            commit_message=commit_message,
+            base_branch=base_branch,
+            target=target,
+        )
+        task_id = agent_run["task_id"]
+        steps[-1] = _step("run_agent", "done", f"task_id={task_id}")
+        _persist()
+
+        # Step 3 — wait agent
+        steps.append(_step("wait_agent", "running"))
+        _persist()
+        agent_result = None
+        for _ in range(_AGENT_POLL_MAX):
+            await asyncio.sleep(_AGENT_POLL_INTERVAL)
+            s = service_client.get_code_agent_status(task_id)
+            if s["status"] == "done":
+                agent_result = s
+                break
+            if s["status"] == "error":
+                steps[-1] = _step("wait_agent", "failed", s.get("error", "agent error"))
+                _persist(status="failed", error=s.get("error", "agent error"))
+                return service_client.get_workflow_status_by_id(eid, user)
+        else:
+            steps[-1] = _step("wait_agent", "failed", "timeout")
+            _persist(status="failed", error="timeout waiting for git agent")
+            return service_client.get_workflow_status_by_id(eid, user)
+
+        branch = agent_result.get("branch", branch)
+        steps[-1] = _step("wait_agent", "done", f"branch={branch}")
+        _persist()
+
+        # Step 4 — create PR (idempotent)
+        steps.append(_step("create_pr", "running"))
+        _persist()
+        pr_result = service_client.create_azure_pull_request(
+            repo=repo,
+            repo_path=repo_path,
+            branch=branch,
+            files=files,
+            target=target,
+            ticket=issue_key,
+            title=f"{issue_key} {commit_message[:80]}",
+        )
+        pr_id = pr_result["pr_id"]
+        pr_url = pr_result.get("pr_url", "")
+        steps[-1] = _step("create_pr", "done", f"pr_id={pr_id} action={pr_result.get('action')}")
+        _persist()
+
+        # Step 5 — wait CI
+        steps.append(_step("wait_ci", "running"))
+        _persist()
+        build_status = "pending"
+        for _ in range(_CI_POLL_MAX):
+            await asyncio.sleep(_CI_POLL_INTERVAL)
+            pr_status = service_client.get_pull_request_status(pr_id, repo)
+            build_status = pr_status.get("build_status", "unknown")
+            if build_status != "pending":
+                break
+        steps[-1] = _step("wait_ci", "done", f"build={build_status}")
+        _persist()
+
+        # Step 6 — update Jira: link PR + transition
+        steps.append(_step("update_jira", "running"))
+        _persist()
+        pr_comment = f"PR #{pr_id} creado: {pr_url}"
+        service_client.add_comment(issue_key, pr_comment, user, jira_token=jira_token)
+        steps[-1] = _step("update_jira", "done")
+        result = {"pr_id": pr_id, "pr_url": pr_url, "branch": branch, "build_status": build_status}
+        service_client.update_workflow(eid, user, status="completed", steps=steps, result=result)
+
+    except Exception as e:
+        steps.append(_step("error", "failed", str(e)))
+        service_client.update_workflow(eid, user, status="failed", steps=steps, error=str(e))
+
+    return service_client.get_workflow_status_by_id(eid, user)
 
 
 _TOOLS = _make_tools()
@@ -529,6 +722,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
         elif name == "get_pull_request_status":
             result = service_client.get_pull_request_status(arguments["pr_id"], arguments["repo"])
+        elif name == "run_create_feature_pr_workflow":
+            result = await _run_create_feature_pr_workflow(arguments, user, jira_token)
+        elif name == "get_workflow_status":
+            result = service_client.get_workflow_status_by_id(arguments["execution_id"], user)
         elif name == "sync_git_worklogs":
             result = service_client.sync_git_worklogs(
                 repo_path=arguments.get("repo_path"),

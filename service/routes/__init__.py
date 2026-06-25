@@ -1,4 +1,5 @@
 from .actions import router as actions_router
+from .workflows import router as workflows_router
 from .git_repos import router as git_repos_router
 from .git_sync import router as git_sync_router
 from .assign import router as assign_router
@@ -17,4 +18,4 @@ from .search import router as search_router
 from .transitions import router as transitions_router
 from .worklog import router as worklog_router
 
-__all__ = ["actions_router", "assign_router", "clone_router", "comments_router", "git_repos_router", "git_sync_router", "issues_router", "labels_router", "link_meta_router", "link_router", "priority_router", "projects_router", "saz_router", "update_router", "summarize_router", "search_router", "transitions_router", "worklog_router"]
+__all__ = ["actions_router", "assign_router", "clone_router", "comments_router", "git_repos_router", "git_sync_router", "issues_router", "labels_router", "link_meta_router", "link_router", "priority_router", "projects_router", "saz_router", "update_router", "summarize_router", "search_router", "transitions_router", "worklog_router", "workflows_router"]

@@ -103,6 +103,10 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `GET` | `/projects` | Lista proyectos registrados en DB (seed + auto-descubiertos) |
 | `GET` | `/projects/{key}` | Config de un proyecto; dispara auto-discovery desde Jira si no existe en DB |
 | `GET` | `/health` | Health check |
+| `POST` | `/workflows/create-feature-pr` | Crea registro de ejecución `pending`; retorna `execution_id` |
+| `GET` | `/workflows/{execution_id}` | Estado actual del workflow (steps + result) |
+| `GET` | `/workflows` | Lista ejecuciones (`?issue_key=`, `?status=`, `?limit=20`) |
+| `PATCH` | `/workflows/{execution_id}` | Actualiza status/steps/result (llamado por MCP tool tras cada paso) |
 
 ## MCP server — tools
 
@@ -124,6 +128,8 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `get_code_agent_status` | dev | Consulta estado de tarea code-agent-mcp (queued/running/done/error) |
 | `create_azure_pull_request` | lead | Idempotente: ensure aux branch + crear o retornar PR en Azure DevOps |
 | `get_pull_request_status` | dev | Estado del PR + build CI en Azure DevOps |
+| `run_create_feature_pr_workflow` | lead | Ejecuta workflow completo: preview → git → PR → CI → link Jira; retorna `execution_id` + steps |
+| `get_workflow_status` | dev | Estado de ejecución de un workflow (steps, result, error) |
 
 ## Security layers
 
@@ -197,7 +203,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 9.1–9.4 — Git Intelligence | ✅ Completa | Scanner subprocess, analyzer sesiones+tiempo, mapper regex+NLP, `POST /git/sync`, repo registry SQLite (`git_repos`), MCP `sync_git_worklogs`/`register_git_repo`/`list_git_repos` |
 | 9.5a — Claude humanizer | ✅ Completa | Ajuste semántico de estimaciones git con Claude (debugging, alta complejidad, trabajo nocturno) |
 | 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere Fase 10 + UI |
-| 10 — Workflow Orchestrator | **Pendiente** | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); diseño en `arch/workflows/workflow-orchestrator.md` |
+| 10 — Workflow Orchestrator | ✅ Completa | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); 4 REST endpoints + 6-step polling engine; 32 schema tests |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
 
 ## Test tickets (limpieza)

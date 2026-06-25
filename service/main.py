@@ -6,8 +6,9 @@ from fastapi import FastAPI
 
 load_dotenv()
 
-from .routes import actions_router, assign_router, clone_router, comments_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router
+from .routes import actions_router, assign_router, clone_router, comments_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router, workflows_router
 from .clients.project_db import init_db, seed
+from .clients.workflow_store import init_workflow_db
 from .git.repo_registry import init_repo_registry
 from .middleware.jira_auth import JiraAuthMiddleware
 
@@ -46,6 +47,7 @@ _SEED_PROJECTS = {
 async def lifespan(app: FastAPI):
     init_db()
     init_repo_registry()
+    init_workflow_db()
     for key, cfg in _SEED_PROJECTS.items():
         seed(key, cfg)
     yield
@@ -80,6 +82,7 @@ app.include_router(summarize_router)
 app.include_router(search_router)
 app.include_router(transitions_router)
 app.include_router(worklog_router)
+app.include_router(workflows_router)
 
 
 @app.get("/health")

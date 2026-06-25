@@ -137,6 +137,61 @@ if [ "$LIVE" = "1" ]; then
     assert_ok "run_code_agent via MCP (respuesta recibida)" "$MCP_RESP" "task_id\|Error\|error"
 fi
 
+# ─── 7. Schema check Fase 10 — 2 tools Workflow Orchestrator ─────────────────────
+
+header "Schema: 2 tools Fase 10 definidos en server.py"
+
+for tool in run_create_feature_pr_workflow get_workflow_status; do
+    if grep -q "\"$tool\"" jira_mcp/server.py; then
+        green "Tool '$tool' en server.py"
+        PASS=$((PASS+1))
+    else
+        red "Tool '$tool' NO encontrado en server.py"
+        FAIL=$((FAIL+1))
+    fi
+done
+
+header "service_client.py: funciones Fase 10"
+
+for fn in create_workflow get_workflow_status_by_id update_workflow preview_code_agent; do
+    if grep -q "^def $fn" jira_mcp/service_client.py; then
+        green "Función '$fn' en service_client.py"
+        PASS=$((PASS+1))
+    else
+        red "Función '$fn' NO encontrada en service_client.py"
+        FAIL=$((FAIL+1))
+    fi
+done
+
+header "RBAC: permisos Fase 10"
+
+if grep -q "run_create_feature_pr_workflow" jira_mcp/rbac.py; then
+    green "run_create_feature_pr_workflow en rbac.py (lead)"
+    PASS=$((PASS+1))
+else
+    red "run_create_feature_pr_workflow NO en rbac.py"
+    FAIL=$((FAIL+1))
+fi
+if grep -q "get_workflow_status" jira_mcp/rbac.py; then
+    green "get_workflow_status en rbac.py (dev)"
+    PASS=$((PASS+1))
+else
+    red "get_workflow_status NO en rbac.py"
+    FAIL=$((FAIL+1))
+fi
+
+header "workflow_store.py: funciones y tabla"
+
+for fn in init_workflow_db create_execution update_execution get_execution list_executions; do
+    if grep -q "^def $fn" service/clients/workflow_store.py; then
+        green "Función '$fn' en workflow_store.py"
+        PASS=$((PASS+1))
+    else
+        red "Función '$fn' NO encontrada en workflow_store.py"
+        FAIL=$((FAIL+1))
+    fi
+done
+
 # ─── Summary ─────────────────────────────────────────────────────────────────────
 
 echo ""

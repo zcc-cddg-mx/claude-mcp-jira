@@ -10,9 +10,11 @@ _TEMPLATE_PATH = os.path.join(
 )
 
 _ENV_LABELS = {
+    "desarrollo": "DEVELOPER",
     "developer": "DEVELOPER",
     "test":      "TEST",
     "uat":       "UAT",
+    "develop":   "PROD",
     "prod":      "PROD",
     "master":    "PROD",
     "main":      "PROD",
@@ -25,7 +27,7 @@ def _env_label(target: str) -> str:
 
 def render_deployment_saz(
     *,
-    issue_key: str | None,
+    task: str,
     repo: str,
     target: str,
     branch: str,
@@ -33,20 +35,17 @@ def render_deployment_saz(
     pr_id: int | str,
     pr_url: str,
     project_label: str = "OV",
+    issue_key: str | None = None,
 ) -> tuple[str, str]:
     """
     Return (summary, description) for a SAZ deployment ticket.
-    Reads the template from templates/saz/despliegue.template.md.
-    Falls back to an inline template if the file is missing.
+    summary: Despliegue ambiente {ENV} - {project_label} - {task}
+    description: rendered from templates/saz/despliegue.template.md
     """
     env = _env_label(target)
-    task_label = issue_key if issue_key else repo
     pr_link_label = f"Pull Request {pr_id}" + (f": {issue_key}" if issue_key else "")
 
-    summary_parts = [f"Despliegue ambiente {env}", project_label, repo]
-    if issue_key:
-        summary_parts.append(issue_key)
-    summary = " - ".join(summary_parts)
+    summary = f"Despliegue ambiente {env} - {project_label} - {task}"
 
     try:
         with open(_TEMPLATE_PATH, encoding="utf-8") as f:
@@ -56,7 +55,7 @@ def render_deployment_saz(
             .replace("{ENV}", env)
             .replace("{proyecto}", project_label)
             .replace("{repositorio}", repo)
-            .replace("{task}", task_label)
+            .replace("{task}", task)
             .replace("pr_id", str(pr_id))
             .replace("{feature/fix}", branch)
             .replace("{destino}", base_branch)

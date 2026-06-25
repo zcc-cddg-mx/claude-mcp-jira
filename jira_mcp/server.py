@@ -476,6 +476,10 @@ def _make_tools() -> list[Tool]:
                         "description": "Short project label used in the SAZ title (default: OV). Only used when create_saz=true.",
                         "default": "OV",
                     },
+                    "saz_task": {
+                        "type": "string",
+                        "description": "Short task description for the SAZ title, e.g. 'Backend - Relatividades Junio'. Only used when create_saz=true.",
+                    },
                     "jira_token": {
                         "type": "string",
                         "description": "Optional Jira PAT to act as a specific user.",
@@ -520,6 +524,7 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
     files = arguments.get("files") or []
     create_saz = arguments.get("create_saz", False)
     project_label = arguments.get("project_label", "OV")
+    saz_task = arguments.get("saz_task") or issue_key
 
     # Step 0 — create execution record
     execution = service_client.create_workflow(
@@ -638,6 +643,7 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
             _persist()
             try:
                 saz_result = service_client.create_deployment_saz(
+                    task=saz_task,
                     repo=repo,
                     target=target,
                     branch=branch,

@@ -282,6 +282,7 @@ def get_pull_request_status(pr_id: int, repo: str) -> dict:
 
 
 def create_deployment_saz(
+    task: str,
     repo: str,
     target: str,
     branch: str,
@@ -294,6 +295,7 @@ def create_deployment_saz(
     jira_token: Optional[str] = None,
 ) -> dict:
     body: dict = {
+        "task": task,
         "repo": repo,
         "target": target,
         "branch": branch,

@@ -67,7 +67,7 @@ async def create_deployment_saz_endpoint(
 
     try:
         summary, description = render_deployment_saz(
-            issue_key=body.znrx_key or "",
+            task=body.task,
             repo=body.repo,
             target=body.target,
             branch=body.branch,
@@ -75,6 +75,7 @@ async def create_deployment_saz_endpoint(
             pr_id=body.pr_id,
             pr_url=body.pr_url,
             project_label=body.project_label,
+            issue_key=body.znrx_key,
         )
         from ..schemas.issue import SAZIssuePayload
         payload = SAZIssuePayload(summary=summary, description=description, issue_type="Support")

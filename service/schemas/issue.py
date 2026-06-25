@@ -212,6 +212,7 @@ class CreateSAZRequest(BaseModel):
 
 
 class CreateDeploymentSAZRequest(BaseModel):
+    task: str = Field(..., min_length=1, max_length=120, example="Backend - Relatividades Junio")
     repo: str = Field(..., min_length=1, max_length=200, example="ov-arizona-backend-ecuador")
     target: str = Field(..., min_length=1, max_length=50, example="test")
     branch: str = Field(..., min_length=1, max_length=255, example="feature/ZNRX-68248-workflow")

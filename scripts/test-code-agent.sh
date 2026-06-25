@@ -9,10 +9,14 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/_conda_env.sh
 source "$(dirname "$0")/_conda_env.sh"
 
+# Load .env for CODE_AGENT_TOKEN if not already set
+[ -f "$REPO_DIR/.env" ] && set -a && source "$REPO_DIR/.env" && set +a
+
 MCP_PORT="${MCP_PORT:-18001}"
 MCP_URL="http://localhost:$MCP_PORT"
-MCP_API_KEY="${MCP_API_KEY:-test-key}"
+MCP_API_KEY="${MCP_API_KEY:-super-secret-internal-key}"
 CODE_AGENT_URL="${CODE_AGENT_URL:-http://localhost:5001}"
+CODE_AGENT_TOKEN="${CODE_AGENT_TOKEN:-}"
 
 PASS=0
 FAIL=0
@@ -115,26 +119,34 @@ if [ "$LIVE" = "1" ]; then
     HEALTH=$(curl -sf "$CODE_AGENT_URL/health" 2>&1 || echo "CONNECTION_FAILED")
     assert_ok "code-agent-mcp /health" "$HEALTH" "ok"
 
-    header "Live: MCP tool run_code_agent (espera error 4xx/5xx sin repo real)"
-    MCP_RESP=$(curl -s -X POST "$MCP_URL/messages" \
+    header "Live: POST /run en code-agent-mcp (espera 403 — repo no registrado)"
+    RUN_RESP=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$CODE_AGENT_URL/run" \
         -H "Content-Type: application/json" \
-        -H "x-api-key: $MCP_API_KEY" \
+        -H "X-Agent-Token: $CODE_AGENT_TOKEN" \
         -d '{
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {
-                "name": "run_code_agent",
-                "arguments": {
-                    "repo": "/nonexistent/path",
-                    "branch": "feature/test",
-                    "files": ["/nonexistent/file.txt"],
-                    "ticket": "ZNRX-00000",
-                    "commit_message": "[TEST] code-agent Fase 11 e2e"
-                }
-            },
-            "id": 1
+            "repo": "/nonexistent/repo",
+            "branch": "feature/test",
+            "files": ["/nonexistent/file.txt"],
+            "ticket": "ZNRX-00000",
+            "commit_message": "[TEST] code-agent e2e"
         }' 2>&1)
-    assert_ok "run_code_agent via MCP (respuesta recibida)" "$MCP_RESP" "task_id\|Error\|error"
+    if echo "$RUN_RESP" | grep -q "^4"; then
+        green "POST /run → HTTP $RUN_RESP (repo no registrado, esperado 4xx)"
+        PASS=$((PASS+1))
+    else
+        red "POST /run → HTTP $RUN_RESP (esperado 4xx)"
+        FAIL=$((FAIL+1))
+    fi
+
+    header "Live: GET /repos en code-agent-mcp"
+    REPOS_RESP=$(curl -s "$CODE_AGENT_URL/repos" \
+        -H "X-Agent-Token: $CODE_AGENT_TOKEN" 2>&1)
+    assert_ok "GET /repos → lista repos" "$REPOS_RESP" "\[\|{\"name\""
+
+    header "Live: GET /azure/pull-requests (repo registrado)"
+    PR_STATUS=$(curl -s "$CODE_AGENT_URL/azure/pull-requests/2573?repo=ov-arizona-backend-ecuador" \
+        -H "X-Agent-Token: $CODE_AGENT_TOKEN" 2>&1)
+    assert_ok "GET /azure/pull-requests/2573" "$PR_STATUS" "pr_id\|not found"
 fi
 
 # ─── 7. Schema check Fase 10 — 2 tools Workflow Orchestrator ─────────────────────

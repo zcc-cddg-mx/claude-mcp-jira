@@ -281,6 +281,35 @@ def get_pull_request_status(pr_id: int, repo: str) -> dict:
         }
 
 
+def create_deployment_saz(
+    repo: str,
+    target: str,
+    branch: str,
+    base_branch: str,
+    pr_id: int | str,
+    pr_url: str,
+    user: str,
+    znrx_key: Optional[str] = None,
+    project_label: str = "OV",
+    jira_token: Optional[str] = None,
+) -> dict:
+    body: dict = {
+        "repo": repo,
+        "target": target,
+        "branch": branch,
+        "base_branch": base_branch,
+        "pr_id": pr_id,
+        "pr_url": pr_url,
+        "project_label": project_label,
+    }
+    if znrx_key:
+        body["znrx_key"] = znrx_key
+    with _client(user, jira_token) as c:
+        r = c.post("/issues/saz/deployment", json=body)
+        r.raise_for_status()
+        return r.json()
+
+
 def preview_code_agent(
     repo: str,
     repo_path: str,

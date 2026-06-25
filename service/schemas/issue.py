@@ -211,6 +211,17 @@ class CreateSAZRequest(BaseModel):
     znrx_key: Optional[str] = Field(None, pattern=r'^[A-Z][A-Z0-9]+-\d+$', example="ZNRX-68126")
 
 
+class CreateDeploymentSAZRequest(BaseModel):
+    repo: str = Field(..., min_length=1, max_length=200, example="ov-arizona-backend-ecuador")
+    target: str = Field(..., min_length=1, max_length=50, example="test")
+    branch: str = Field(..., min_length=1, max_length=255, example="feature/ZNRX-68248-workflow")
+    base_branch: str = Field(..., min_length=1, max_length=255, example="develop")
+    pr_id: int = Field(..., example=2505)
+    pr_url: str = Field(..., min_length=10, max_length=500, example="https://dev.azure.com/ZurichInsurance-EC/...")
+    project_label: str = Field("OV", max_length=50, example="OV")
+    znrx_key: Optional[str] = Field(None, pattern=r'^[A-Z][A-Z0-9]+-\d+$', example="ZNRX-68248")
+
+
 class SAZIssuePayload(BaseModel):
     summary: str = Field(..., max_length=255)
     description: str

@@ -246,11 +246,14 @@ def create_saz_issue(payload: SAZIssuePayload, znrx_key: Optional[str] = None) -
     }
     saz_key = _post("/rest/api/2/issue", {"fields": fields})["key"]
     if znrx_key:
-        _post_noret("/rest/api/2/issueLink", {
-            "type": {"name": "Relates"},
-            "outwardIssue": {"key": saz_key},
-            "inwardIssue": {"key": znrx_key},
-        })
+        try:
+            _post_noret("/rest/api/2/issueLink", {
+                "type": {"name": "Relates"},
+                "outwardIssue": {"key": saz_key},
+                "inwardIssue": {"key": znrx_key},
+            })
+        except Exception:
+            pass  # SAZ created; link is best-effort
     return saz_key
 
 

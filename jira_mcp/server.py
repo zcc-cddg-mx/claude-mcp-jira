@@ -466,6 +466,16 @@ def _make_tools() -> list[Tool]:
                         "items": {"type": "string"},
                         "description": "Files to stage. Leave empty to auto-detect via preview dry-run.",
                     },
+                    "create_saz": {
+                        "type": "boolean",
+                        "description": "If true, automatically create a SAZ deployment ticket linked to issue_key after the PR is ready (default: false).",
+                        "default": False,
+                    },
+                    "project_label": {
+                        "type": "string",
+                        "description": "Short project label used in the SAZ title (default: OV). Only used when create_saz=true.",
+                        "default": "OV",
+                    },
                     "jira_token": {
                         "type": "string",
                         "description": "Optional Jira PAT to act as a specific user.",
@@ -508,6 +518,8 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
     target = arguments.get("target", "developer")
     commit_message = arguments["commit_message"]
     files = arguments.get("files") or []
+    create_saz = arguments.get("create_saz", False)
+    project_label = arguments.get("project_label", "OV")
 
     # Step 0 — create execution record
     execution = service_client.create_workflow(
@@ -611,13 +623,41 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
         steps[-1] = _step("wait_ci", "done", f"build={build_status}")
         _persist()
 
-        # Step 6 — update Jira: link PR + transition
+        # Step 6 — update Jira: link PR comment
         steps.append(_step("update_jira", "running"))
         _persist()
         pr_comment = f"PR #{pr_id} creado: {pr_url}"
         service_client.add_comment(issue_key, pr_comment, user, jira_token=jira_token)
         steps[-1] = _step("update_jira", "done")
+        _persist()
+
+        # Step 7 — create SAZ deployment ticket (optional)
+        saz_key = None
+        if create_saz:
+            steps.append(_step("create_saz", "running"))
+            _persist()
+            try:
+                saz_result = service_client.create_deployment_saz(
+                    repo=repo,
+                    target=target,
+                    branch=branch,
+                    base_branch=base_branch,
+                    pr_id=pr_id,
+                    pr_url=pr_url,
+                    user=user,
+                    znrx_key=issue_key,
+                    project_label=project_label,
+                    jira_token=jira_token,
+                )
+                saz_key = saz_result.get("saz_key")
+                steps[-1] = _step("create_saz", "done", f"saz_key={saz_key}")
+            except Exception as saz_err:
+                steps[-1] = _step("create_saz", "failed", str(saz_err))
+            _persist()
+
         result = {"pr_id": pr_id, "pr_url": pr_url, "branch": branch, "build_status": build_status}
+        if saz_key:
+            result["saz_key"] = saz_key
         service_client.update_workflow(eid, user, status="completed", steps=steps, result=result)
 
     except Exception as e:

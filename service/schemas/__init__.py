@@ -15,6 +15,7 @@ from .issue import (
     CloneIssueResponse,
     CreateIssueRequest,
     CreateIssueResponse,
+    CreateDeploymentSAZRequest,
     CreateSAZRequest,
     CreateSAZResponse,
     IssueResult,

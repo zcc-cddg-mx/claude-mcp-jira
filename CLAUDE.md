@@ -129,6 +129,9 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `get_code_agent_status` | dev | Consulta estado de tarea code-agent-mcp (queued/running/done/error) |
 | `create_azure_pull_request` | lead | Idempotente: ensure aux branch + crear o retornar PR en Azure DevOps |
 | `get_pull_request_status` | dev | Estado del PR + build CI en Azure DevOps |
+| `update_pull_request_status` | lead | Cambia estado de PR Azure: abandoned, completed, active |
+| `create_deployment_saz_workflow` | lead | Workflow sincrónico: lookup repo → crear PR Azure → crear SAZ de despliegue; `ticket` acepta Jira key o número de requerimiento |
+| `set_repo_branch_map` | lead | Configura mapping target→branch por repo en code-agent-mcp (ej: `{"developer":"developer","prod":"develop"}`) |
 | `run_create_feature_pr_workflow` | lead | Ejecuta workflow completo: preview → git → PR → CI → link Jira; retorna `execution_id` + steps |
 | `get_workflow_status` | dev | Estado de ejecución de un workflow (steps, result, error) |
 
@@ -206,6 +209,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere Fase 10 + UI |
 | 10 — Workflow Orchestrator | ✅ Completa | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); 4 REST endpoints + 6-step polling engine; 32 schema tests |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
+| 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; 45/45 schema tests |
 
 ## Test tickets (limpieza)
 

@@ -653,6 +653,51 @@ Ajuste semántico de estimaciones git con Claude antes de registrar worklogs:
 
 ---
 
+## Fase 12 — Deployment SAZ workflow + PR lifecycle ✅ Completa (2026-06-25)
+
+**Objetivo**: simplificar el flujo DevOps para solicitar despliegues: dado un repo + rama + ambiente, crear automáticamente el PR Azure y el SAZ de solicitud de despliegue.
+
+### MCP tools añadidos
+
+| Tool | Rol | Descripción |
+|---|---|---|
+| `create_deployment_saz_workflow` | lead | Workflow sincrónico: lookup repo → PR Azure (idempotente) → SAZ despliegue |
+| `update_pull_request_status` | lead | Cambia estado PR: `abandoned`, `completed`, `active` |
+| `set_repo_branch_map` | lead | Configura mapping `target→branch` por repo en code-agent-mcp |
+
+### Mapping ambiente → rama
+
+| `target` | Rama destino PR | ENV en SAZ |
+|---|---|---|
+| `developer` | `developer` | DEVELOPER |
+| `test` | `test` | TEST |
+| `prod` | `develop` | PROD (DevOps hace develop→main manualmente) |
+
+Delegado a code-agent-mcp via `PATCH /repos/<name>/branch-map` + `resolve_target_branch()` con fallback 3 niveles.
+
+### Decisiones de diseño
+
+- `base_branch` para SAZ viene del response del PR (code-agent-mcp lo resuelve con `git merge-base`), no se calcula localmente
+- Campo `ticket` acepta tanto Jira keys (`ZNRX-123`) como IDs de requerimiento (`REQ2298577`); `znrx_key` del SAZ se omite si no tiene formato `^[A-Z][A-Z0-9]+-\d+$`
+- `{destino}` en plantilla SAZ usa `target` (rama de integración), no `base_branch` — es lo que DevOps necesita ver
+- Workflow es sincrónico (no polling) — `POST /azure/prepare-and-pr` retorna directo
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `jira_mcp/server.py` | 3 tools nuevos + `_run_create_deployment_saz_workflow()` + validación `znrx_key` |
+| `jira_mcp/service_client.py` | `update_pull_request_status()`, `get_repo_by_alias()`, `set_repo_branch_map()` |
+| `jira_mcp/rbac.py` | 3 tools añadidos a roles `lead` y `system` |
+| `service/clients/saz_template.py` | `_TARGET_BASE_BRANCH` dict + `get_base_branch_for_target()` + fix `{destino}` usa `target` |
+| `scripts/test-code-agent.sh` | 45/45 tests (4 secciones nuevas para Fase 12) |
+
+### Criterio de éxito
+
+PRs #2574 (DEVELOPER) y #2575 (TEST) + SAZ-7441 y SAZ-7442 creados en Azure DevOps / Jira para `ov-arizona-backend-ecuador` — entregados al equipo DevOps para despliegue real.
+
+---
+
 ## Fase 11 — Integración code-agent-mcp ✅ Completa (2026-06-23)
 
 **Objetivo**: delegar las operaciones git y Azure DevOps PR al servicio `code-agent-mcp` ya funcional.

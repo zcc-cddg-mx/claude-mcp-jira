@@ -245,16 +245,17 @@ def create_azure_pull_request(
     title: str,
     description: str = "",
 ) -> dict:
-    body = {
+    body: dict = {
         "repo": repo,
         "repo_path": repo_path,
         "branch": branch,
-        "files": files,
         "target": target,
         "ticket": ticket,
         "title": title,
         "description": description,
     }
+    if files:
+        body["files"] = files  # omit when empty → code-agent auto-detects
     with _agent_client() as c:
         r = c.post("/azure/prepare-and-pr", json=body)
         r.raise_for_status()

@@ -381,7 +381,7 @@ claude-mcp-jira/
 | Persistencia MCP | Ninguna — stateless | Sin disco, escalable, menor superficie de ataque |
 | Trazabilidad | `request_id` UUID por operación | Correlacionar logs sin sesiones complejas |
 | Registro proyectos | SQLite + auto-discovery lazy | Soporte multi-equipo sin admin; cualquier proyecto Jira válido funciona en el primer acceso |
-| Allowlist proyectos | Opcional (`JIRA_ALLOWED_PROJECTS`) | Si está vacía, cualquier proyecto Jira válido es aceptado |
+| Allowlist proyectos | `JIRA_ALLOWED_PROJECTS` (vacío por defecto) | Seguridad delegada al PAT de Jira y token Azure; allowlist solo si se quiere restricción adicional |
 | Link types | Consultados en tiempo real + cache 1h | Portable entre instancias Jira; no hardcodeados |
 | Endpoints | Commands explícitos por acción | Issue Jira = aggregate; mejor auditoría y uso por Claude/MCP |
 | Swagger en producción | Deshabilitado (`APP_ENV=prod`) | Evitar exposición de contratos internos |

@@ -12,8 +12,8 @@ from .project_db import get_or_discover
 
 _DEFAULT_PROJECT = os.environ.get("JIRA_DEFAULT_PROJECT", os.environ.get("JIRA_PROJECT_KEY", ""))
 
-# JIRA_ALLOWED_PROJECTS is now advisory — it gates which projects users can send
-# via the API. If empty, any project that exists in Jira is allowed.
+# Security is delegated to the Jira PAT and Azure token — if the user has no
+# permissions in a project, Jira returns 403/404. No allowlist needed here.
 _ALLOWED_RAW = os.environ.get("JIRA_ALLOWED_PROJECTS", "")
 ALLOWED_PROJECTS: list[str] = [p.strip().upper() for p in _ALLOWED_RAW.split(",") if p.strip()]
 
@@ -26,8 +26,9 @@ def get_config(project_key: str) -> dict:
 def resolve_project(requested: Optional[str]) -> str:
     """
     Resolve and validate the effective project key.
-    - If JIRA_ALLOWED_PROJECTS is set, project must be in the list.
-    - Always verifies the project exists in Jira (via get_or_discover).
+    JIRA_ALLOWED_PROJECTS is optional — if empty, any project the user's PAT
+    can reach is accepted. Jira enforces the real permission boundary.
+    Always verifies the project exists in Jira (via get_or_discover).
     Raises ValueError on invalid or nonexistent project.
     """
     key = (requested or _DEFAULT_PROJECT).upper()

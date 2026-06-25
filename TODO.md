@@ -17,11 +17,6 @@ Actualizar este archivo al completar o añadir tareas.
 ### Implementación
 
 
-- [ ] **Vaciar `JIRA_ALLOWED_PROJECTS`** — allowlist self-service *(decisión pendiente)*
-  - Actualmente `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` bloquea proyectos no listados aunque existan en Jira y estén en la DB (validado con ARQX — auto-discovery OK pero create → 400)
-  - Propuesta: dejar `JIRA_ALLOWED_PROJECTS=` vacío; el control de acceso real lo da el PAT de Jira (solo puede crear donde tiene permisos)
-  - Impacto: cambio solo en `.env` + reinicio; no requiere código
-  - Pendiente de decisión con el equipo antes de aplicar en producción
 
 - [ ] **Tests live Fase 11** *(bajo — requiere code-agent-mcp corriendo)*
   - Ejecutar `bash scripts/test-code-agent.sh --live` con `CODE_AGENT_URL` apuntando a una instancia del agente
@@ -156,6 +151,7 @@ Actualizar este archivo al completar o añadir tareas.
   - `scripts/test-code-agent.sh` — 19/19 tests (schema, dispatch, funciones, env vars)
   - `.env.example` — sección `CODE AGENT MCP`: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`, `CODE_AGENT_TIMEOUT`
   - `code-agent-mcp` ya funcional (73 tests, PRs #2552-2554 reales); claude-mcp-jira ahora orquesta flujo completo Jira → git → PR Azure
+- [x] `JIRA_ALLOWED_PROJECTS` vaciado (2026-06-25) — seguridad delegada al PAT de Jira y token Azure; Fase 8 UI poblará la lista según proyectos accesibles por PAT del usuario
 - [x] Verificación empírica Sub-tasks ZNRX (2026-06-25):
   - `issuetype.id=18124` (`Subtarea Historia`) + `parent.key` + **sin** `customfield_25832` → ✅ crea correctamente
   - `issuetype: {"name": "Sub-task"}` → 400 (no existe en ZNRX)

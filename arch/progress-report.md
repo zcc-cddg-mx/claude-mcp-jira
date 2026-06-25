@@ -92,7 +92,7 @@ Estado persistido en SQLite en cada paso — `get_workflow_status` permite diagn
 | Item | Prioridad | Dependencia |
 |---|---|---|
 | Tests live Fase 11 (`--live`) | Baja | `code-agent-mcp` corriendo en `:5001` |
-| Decisión `JIRA_ALLOWED_PROJECTS` vaciar o no | Administrativo | Equipo |
+| ~~Decisión `JIRA_ALLOWED_PROJECTS`~~ | ✅ Resuelto | Vaciado — seguridad delegada al PAT/token |
 | Fase 6 — Observabilidad (Prometheus + OTel) | Media | Volumen de uso justificado |
 | Fase 8 — UI (Streamlit MVP → Next.js) | Alta (si hay adopción) | Demanda no-técnica validada |
 | Fase 9.5b — Learning layer + multiplier factors | Media | Fase 8 (UI) |

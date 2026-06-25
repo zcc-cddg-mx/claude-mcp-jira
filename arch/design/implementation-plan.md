@@ -305,7 +305,7 @@ Compartir el MCP server con otros equipos implica que usuarios distintos acceder
 
 **Contexto**: validado con el proyecto ARQX (2026-06-22) — `GET /projects/ARQX` dispara auto-discovery correctamente y persiste la config en DB, pero `POST /issues {project: "ARQX"}` devuelve 400 porque `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` lo bloquea antes de llegar a Jira.
 
-**Propuesta**: vaciar `JIRA_ALLOWED_PROJECTS` en `.env`. El control de acceso real lo ejerce el PAT de Jira — si el usuario no tiene permisos en un proyecto, Jira devuelve 403/404. La allowlist es una capa redundante que añade fricción cuando el servidor se comparte con múltiples equipos.
+**Resuelto (2026-06-25)**: `JIRA_ALLOWED_PROJECTS` vaciado en `.env` y `.env.example`. La seguridad la ejerce el PAT de Jira (403/404 si el usuario no tiene permisos) y el token Azure en code-agent-mcp. La allowlist queda disponible como restricción opcional. Fase 8 UI la populará dinámicamente con los proyectos accesibles según el PAT del usuario.
 
 **Cambio necesario**: solo `.env` + reinicio del service layer. Sin cambios de código.
 

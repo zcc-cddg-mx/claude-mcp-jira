@@ -16,11 +16,6 @@ Actualizar este archivo al completar o añadir tareas.
 
 ### Implementación
 
-- [ ] **Verificar empíricamente conversión Task→Sub-task en ZNRX, SCRX, SAZ** *(bajo — se espera mismo comportamiento)*
-  - Limitación documentada en `docs/jira-subtasks.md`: en AIPROJECTS confirmado que la API no lo permite
-  - Tipos de sub-task reales obtenidos para los 4 proyectos (ver tabla en `docs/jira-subtasks.md`)
-  - ZNRX no tiene tipo "Sub-task" genérico — usar `Subtarea Historia` (id=18124) o `Casos de Prueba` (id=18121)
-  - Workaround documentado: crear nuevo Sub-task desde el inicio con `parent` + marcar Task original como Done
 
 - [ ] **Vaciar `JIRA_ALLOWED_PROJECTS`** — allowlist self-service *(decisión pendiente)*
   - Actualmente `JIRA_ALLOWED_PROJECTS=ZNRX,AIPROJECTS,SCRX` bloquea proyectos no listados aunque existan en Jira y estén en la DB (validado con ARQX — auto-discovery OK pero create → 400)
@@ -161,6 +156,11 @@ Actualizar este archivo al completar o añadir tareas.
   - `scripts/test-code-agent.sh` — 19/19 tests (schema, dispatch, funciones, env vars)
   - `.env.example` — sección `CODE AGENT MCP`: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`, `CODE_AGENT_TIMEOUT`
   - `code-agent-mcp` ya funcional (73 tests, PRs #2552-2554 reales); claude-mcp-jira ahora orquesta flujo completo Jira → git → PR Azure
+- [x] Verificación empírica Sub-tasks ZNRX (2026-06-25):
+  - `issuetype.id=18124` (`Subtarea Historia`) + `parent.key` + **sin** `customfield_25832` → ✅ crea correctamente
+  - `issuetype: {"name": "Sub-task"}` → 400 (no existe en ZNRX)
+  - `PUT issuetype Task` sobre sub-task existente → 204 pero ignorado silenciosamente
+  - Documentado en `docs/jira-subtasks.md` — tabla de verificación actualizada
 - [x] Fase 10 — Workflow Orchestrator (2026-06-25):
   - `service/clients/workflow_store.py` — SQLite `workflow_executions`, 5 funciones CRUD
   - `service/schemas/workflow_schemas.py` — `CreateFeaturePRRequest`, `WorkflowExecutionResponse`, `WorkflowStepStatus`, `WorkflowUpdateRequest`

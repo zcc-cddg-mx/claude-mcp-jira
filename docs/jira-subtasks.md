@@ -88,11 +88,22 @@ Campos requeridos para crear una sub-task vía REST:
 
 ## Verificación por proyecto
 
-| Proyecto | Conversión Task→Sub-task vía API | Estado verificación |
-|---|---|---|
-| AIPROJECTS | ❌ No posible | Verificado en pruebas 2026-06-22 |
-| ZNRX | ❌ No posible (comportamiento igual en toda la instancia DC) | Pendiente verificación empírica |
-| SCRX | ❌ No posible (comportamiento igual en toda la instancia DC) | Pendiente verificación empírica |
-| SAZ | ❌ No posible (comportamiento igual en toda la instancia DC) | Pendiente verificación empírica |
+| Proyecto | Conversión Task→Sub-task vía API | Creación directa sub-task | Estado verificación |
+|---|---|---|---|
+| AIPROJECTS | ❌ No posible | ✅ `issuetype.id=10003` + `parent.key` | Verificado 2026-06-22 |
+| ZNRX | ❌ No posible | ✅ `issuetype.id=18124` + `parent.key` (sin `customfield_25832`) | Verificado 2026-06-25 |
+| SCRX | ❌ No posible (instancia DC, igual que AIPROJECTS/ZNRX) | ✅ `issuetype.id=10003` + `parent.key` | Inferido por instancia |
+| SAZ | ❌ No posible (instancia DC, igual que AIPROJECTS/ZNRX) | ✅ `issuetype.id=10003` + `parent.key` | Inferido por instancia |
 
-La limitación es a nivel de instancia Jira Server/DC, no de configuración de proyecto — se espera el mismo comportamiento en todos los proyectos de `jira.zurich.com`.
+La limitación es a nivel de instancia Jira Server/DC — confirmada empíricamente en AIPROJECTS (2026-06-22) y ZNRX (2026-06-25).
+
+### Hallazgos adicionales ZNRX (2026-06-25)
+
+Verificado sobre `ZNRX-68248` (Task con 6 sub-tasks de tipo `Subtarea Historia`):
+
+1. `issuetype: {"name": "Sub-task"}` → `400` — tipo inválido en ZNRX (no existe ese nombre)
+2. `issuetype: {"id": "18124"}` + `customfield_25832` → `400` — el campo no está en la pantalla de sub-tasks
+3. `issuetype: {"id": "18124"}` **sin** `customfield_25832` → `201` ✅ — crea `Subtarea Historia` correctamente
+4. `PUT issuetype: {"name": "Task"}` sobre una `Subtarea Historia` existente → `204` pero **ignorado silenciosamente** — el tipo no cambia
+
+**Regla definitiva para ZNRX**: crear sub-tasks siempre con `issuetype.id=18124` + `parent.key`, sin incluir `customfield_25832`.

@@ -174,7 +174,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | Plan de implementación | `arch/design/implementation-plan.md` |
 | Informe técnico MCP | `arch/reports/mcp-technical-report.md` |
 | MCP server config | `jira_mcp/README.md` |
-| Integración code-agent-mcp (Fase 11) | `arch/code-agent/integration-plan.md` |
+| Integración code-agent-mcp (Fases 11-12) + contrato 23 endpoints | `arch/code-agent/integration-plan.md` |
 | Workflow Orchestrator (Fase 10) | `arch/workflows/workflow-orchestrator.md` |
 | Proyectos Jira (restricciones, TICKET_LANG) | `docs/jira-projects.md` |
 | Campos requeridos por proyecto | `docs/jira-fields.md` |
@@ -210,6 +210,18 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 10 — Workflow Orchestrator | ✅ Completa | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); 4 REST endpoints + 6-step polling engine; 32 schema tests |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
 | 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; 45/45 schema tests |
+
+## code-agent-mcp — estrategia de integración de endpoints
+
+`code-agent-mcp` expone 23 endpoints. De estos, **7 están integrados como MCP tools** (Fases 11-12). El resto se integra solo bajo demanda cuando surja un flujo operativo concreto.
+
+| Estado | Endpoints | Criterio |
+|---|---|---|
+| ✅ Integrados (7 tools) | `POST /run`, `GET /status/<id>`, `POST /azure/prepare-and-pr`, `GET/PATCH /azure/pull-requests/<id>`, `PATCH /repos/<n>/branch-map` | Flujos activos de desarrollo y despliegue |
+| 🔲 Candidato futuro | `GET /prs`, `GET /prs/<id>` | Cuando se necesite listar PRs activos por repo |
+| ⛔ No exponer | `POST /repos`, `PUT /config/branches`, `/projects`, legacy `/azure/pull-requests` | Setup puntual → Swagger (`http://localhost:5001/apidocs/`), o reemplazado |
+
+Contrato completo con campos y tipos: `arch/code-agent/integration-plan.md`.
 
 ## Test tickets (limpieza)
 

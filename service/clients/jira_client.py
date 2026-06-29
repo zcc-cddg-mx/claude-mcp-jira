@@ -121,7 +121,14 @@ def log_work(key: str, payload: LogWorkPayload) -> None:
     if payload.comment:
         body["comment"] = payload.comment
     if payload.started:
-        body["started"] = payload.started
+        # Claude returns midnight UTC (T00:00:00.000+0000) when only a date is given.
+        # Jira stores UTC and displays in server TZ (Europe/Madrid UTC+2), which can
+        # shift the date. Normalize to 09:00 Ecuador time (-0500) so the worklog always
+        # falls on the intended calendar day in any server timezone.
+        started = payload.started
+        if "T00:00:00.000+0000" in started:
+            started = started.replace("T00:00:00.000+0000", "T09:00:00.000-0500")
+        body["started"] = started
     _post_noret(f"/rest/api/2/issue/{key}/worklog", body)
 
 

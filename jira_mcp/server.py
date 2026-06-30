@@ -13,7 +13,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import Mount, Route
 
-load_dotenv()
+load_dotenv(override=True)
 
 from .auth import verify_api_key, verify_ip
 from .rbac import check_permission

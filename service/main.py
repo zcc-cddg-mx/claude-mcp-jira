@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
-load_dotenv()
+load_dotenv(override=True)
 
-from .routes import actions_router, assign_router, clone_router, comments_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router, workflows_router
+from .routes import actions_router, assign_router, clone_router, comments_router, deployment_workflow_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router, workflows_router
 from .clients.project_db import init_db, seed
 from .clients.workflow_store import init_workflow_db
 from .git.repo_registry import init_repo_registry
@@ -65,6 +65,7 @@ app = FastAPI(
 app.add_middleware(JiraAuthMiddleware)
 
 app.include_router(actions_router)
+app.include_router(deployment_workflow_router)
 app.include_router(git_repos_router)
 app.include_router(git_sync_router)
 app.include_router(assign_router)

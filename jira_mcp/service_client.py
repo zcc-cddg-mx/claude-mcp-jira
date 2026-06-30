@@ -6,14 +6,14 @@ import httpx
 _SERVICE_URL = os.environ.get("SERVICE_URL", "http://service:8000")
 _TIMEOUT = int(os.environ.get("MCP_SERVICE_TIMEOUT", "30"))
 _CODE_AGENT_URL = os.environ.get("CODE_AGENT_URL", "http://code-agent-mcp:5001")
-_CODE_AGENT_TOKEN = os.environ.get("CODE_AGENT_TOKEN", "")
 _CODE_AGENT_TIMEOUT = int(os.environ.get("CODE_AGENT_TIMEOUT", "30"))
 
 
 def _agent_client() -> httpx.Client:
+    token = os.environ.get("TOKEN_AZURE", "")
     return httpx.Client(
         base_url=_CODE_AGENT_URL,
-        headers={"X-Agent-Token": _CODE_AGENT_TOKEN},
+        headers={"X-Agent-Token": token},
         timeout=_CODE_AGENT_TIMEOUT,
     )
 

@@ -4,14 +4,14 @@ from typing import Optional
 import httpx
 
 _CODE_AGENT_URL = os.environ.get("CODE_AGENT_URL", "http://code-agent-mcp:5001")
-_CODE_AGENT_TOKEN = os.environ.get("CODE_AGENT_TOKEN", "")
 _TIMEOUT = int(os.environ.get("CODE_AGENT_TIMEOUT", "30"))
 
 
 def _client() -> httpx.Client:
+    token = os.environ.get("TOKEN_AZURE", "")
     return httpx.Client(
         base_url=_CODE_AGENT_URL,
-        headers={"X-Agent-Token": _CODE_AGENT_TOKEN},
+        headers={"X-Agent-Token": token},
         timeout=_TIMEOUT,
     )
 

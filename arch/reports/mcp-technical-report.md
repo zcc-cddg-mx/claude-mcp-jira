@@ -22,7 +22,7 @@ El sistema opera como un **Agente especializado Ecuador** — equivalente al con
 | **Workflow Orchestrator** | 6 pasos orquestados: commit → rama → PR → CI → Jira | ❌ No |
 | **Azure DevOps EC** | Integración con tenant `ZurichInsurance-EC / Oficina-Virtual-ZEC` | ❌ No |
 
-**Estado actual:** 19 MCP tools operativos · 232 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich.
+**Estado actual:** 19 MCP tools operativos · 240 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich.
 
 ---
 
@@ -152,6 +152,8 @@ create_deployment_saz_workflow(repo="ov-arizona-backend-ecuador", branch="featur
 → SAZ-7442 creado: "Despliegue ambiente TEST - OV - Limite Autos - Backend Ecuador"
 ```
 
+También disponible como REST endpoint directo: `POST /deployments/saz-workflow` (service layer :18000).
+
 ### 3.5 Workflow Orchestrator (2 tools)
 
 | Tool | Rol | Descripción |
@@ -179,7 +181,7 @@ create_deployment_saz_workflow(repo="ov-arizona-backend-ecuador", branch="featur
 | JQL seguro | Claude → struct → builder controlado; `_jql_escape` en todos los campos; MAX 50 |
 | Pre-validación | Rechaza inputs vacíos o > 2000 chars antes de llamar al backend |
 | Output normalizado | LLM recibe solo `{key, status}` o `{key, summary}` — sin datos internos |
-| code-agent token | `X-Agent-Token` separado del `JIRA_PAT`; valor en `CODE_AGENT_TOKEN` |
+| code-agent token | `X-Agent-Token` separado del `JIRA_PAT`; valor en `TOKEN_AZURE` (variable única consolidada) |
 | SSE timeout | `asyncio.wait_for` con `MCP_SSE_TIMEOUT=300s` |
 
 ---
@@ -207,9 +209,9 @@ create_deployment_saz_workflow(repo="ov-arizona-backend-ecuador", branch="featur
 | `test-multi.sh` | 19 e2e | Multi-proyecto + auto-discovery |
 | `test-actions.sh` | 24 e2e | comments, assign, priority, labels, worklog, transition, clone, link, SAZ |
 | `test-git.sh` | 26 e2e | Git registry CRUD + sync dry_run |
-| `test-code-agent.sh` | 49 schema+live | Fases 10/11/12: tools, dispatch, RBAC, funciones |
+| `test-code-agent.sh` | 57 schema+live | Fases 10/11/12 + endpoint `/deployments/saz-workflow`: tools, dispatch, RBAC, funciones, token consolidado |
 | `pytest tests/` | 96 unit | sanitizer, jql_builder, auth, rbac, git_analyzer, git_mapper, jira_pat_routing |
-| **Total** | **232** | |
+| **Total** | **240** | |
 
 Flujos reales validados: PRs #2574/#2575 en Azure DevOps · SAZ-7441/7442 en Jira · ZNRX-68298 vía MCP global.
 
@@ -289,7 +291,7 @@ claude-mcp-jira  [AGENTE Ecuador — orquestación + especialización]
 conda env create -f environment.yml
 conda activate claude-mcp-jira
 cp .env.example .env
-# Completar: JIRA_PAT, MCP_API_KEY, CODE_AGENT_TOKEN
+# Completar: JIRA_PAT, MCP_API_KEY, TOKEN_AZURE
 # Descomentar: REQUESTS_CA_BUNDLE=certs/zurichseguros-rootca-until-2031_03_20.crt
 
 # Levantar stack completo

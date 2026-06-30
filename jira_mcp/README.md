@@ -36,6 +36,28 @@ Corre como servicio Docker dentro de la red corporativa Zurich. Delega toda la l
 | `create_azure_pull_request` | lead | Idempotente: asegura que la rama auxiliar existe/está al día y crea (o devuelve el existente) el PR en Azure DevOps. Retorna `action` (created/updated/unchanged), `pr_id`, `pr_url`. |
 | `get_pull_request_status` | dev | Estado del PR (`active/completed/abandoned`) + build CI (`pending/succeeded/failed/unknown`). |
 
+### Deployment SAZ workflow (Fase 12)
+
+| Herramienta | Rol mínimo | Descripción |
+|---|---|---|
+| `create_deployment_saz_workflow` | lead | Sincrónico: lookup repo → PR Azure (idempotente) → SAZ Jira. `ticket` acepta Jira key o ID de requerimiento. Retorna `{pr_id, pr_url, aux_branch, saz_key, summary, status}`. |
+| `update_pull_request_status` | lead | Cambia estado de un PR en Azure DevOps: `abandoned`, `completed`, `active`. |
+| `set_repo_branch_map` | lead | Configura mapping `target→branch` por repo en code-agent-mcp (ej: `{"developer":"developer","test":"test","prod":"develop"}`). |
+
+**Flujo despliegue típico:**
+```
+create_deployment_saz_workflow(
+  repo="ov-arizona-backend-ecuador",
+  branch="feature/REQ2298577_limite_autos",
+  target="test",
+  ticket="REQ2298577"
+)
+→ PR #2575 creado en Azure DevOps (feature/REQ2298577 → test)
+→ SAZ-7442: "Despliegue ambiente TEST - OV - Limite Autos - Backend Ecuador"
+```
+
+**Nota**: el endpoint REST equivalente es `POST /deployments/saz-workflow` en el service layer.
+
 **Flujo orquestado desde Claude Code (Fase 11 — herramientas individuales):**
 ```
 1. create_jira_issue       → ZNRX-XXXXX
@@ -137,7 +159,7 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 | `JIRA_MAX_RESULTS` | `50` | Máximo de resultados en búsquedas (hard cap: 50) |
 | `TICKET_LANG` | `es` | Idioma del contenido generado: `es` \| `en` (ver `docs/jira-projects.md`) |
 | `CODE_AGENT_URL` | `http://code-agent-mcp:5001` | URL del code-agent-mcp (Fase 11) |
-| `CODE_AGENT_TOKEN` | `` | Token de auth para code-agent-mcp (`X-Agent-Token`); mismo valor que `TOKEN_AZURE` en ese servicio |
+| `TOKEN_AZURE` | `` | PAT de Azure DevOps — usado como `X-Agent-Token` para autenticar contra code-agent-mcp |
 | `CODE_AGENT_TIMEOUT` | `30` | Timeout para llamadas al code-agent-mcp (segundos) |
 
 ## RBAC — permisos por rol
@@ -145,7 +167,7 @@ Para despliegue interno, reemplazar `localhost:8001` por el hostname del servido
 | Rol | Herramientas permitidas |
 |---|---|
 | `dev` | `create`, `get`, `search`, `add_comment`, `link`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `get_code_agent_status`, `get_pull_request_status`, `get_workflow_status` |
-| `lead` | `create`, `update`, `get`, `search`, `add_comment`, `link`, `assign`, `set_priority`, `create_saz_request`, `sync_git_worklogs`, `register_git_repo`, `list_git_repos`, `run_code_agent`, `get_code_agent_status`, `create_azure_pull_request`, `get_pull_request_status`, `run_create_feature_pr_workflow`, `get_workflow_status` |
+| `lead` | todo lo de `dev` + `update`, `assign`, `set_priority`, `create_saz_request`, `run_code_agent`, `create_azure_pull_request`, `run_create_feature_pr_workflow`, `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map` |
 | `system` | todas |
 
 Ejemplo de configuración con múltiples claves:

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Test e2e — Fase 11: integración con code-agent-mcp.
-# Verifica que los 4 MCP tools existen en el server y que el cliente HTTP
-# intenta conectarse al code-agent-mcp (espera falla de conexión si no está corriendo).
+# Test e2e — Fases 10/11/12 + endpoint /deployments/saz-workflow.
+# Verifica schema (tools definidos, funciones existentes, RBAC) y, con --live,
+# ejecuta llamadas reales contra el service layer (:18000) y code-agent-mcp (:5001).
 # Uso: bash scripts/test-code-agent.sh [--live]
-#   --live: asumir que code-agent-mcp corre en CODE_AGENT_URL y ejecutar llamadas reales.
+#   --live: asumir que el service layer corre en :18000 y code-agent-mcp en :5001.
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=scripts/_conda_env.sh
@@ -12,11 +12,13 @@ source "$(dirname "$0")/_conda_env.sh"
 # Load .env for CODE_AGENT_TOKEN if not already set
 [ -f "$REPO_DIR/.env" ] && set -a && source "$REPO_DIR/.env" && set +a
 
+SERVICE_PORT="${SERVICE_PORT:-18000}"
+SERVICE_URL_LOCAL="http://localhost:$SERVICE_PORT"
 MCP_PORT="${MCP_PORT:-18001}"
 MCP_URL="http://localhost:$MCP_PORT"
 MCP_API_KEY="${MCP_API_KEY:-super-secret-internal-key}"
 CODE_AGENT_URL="${CODE_AGENT_URL:-http://localhost:5001}"
-CODE_AGENT_TOKEN="${CODE_AGENT_TOKEN:-}"
+TOKEN_AZURE="${TOKEN_AZURE:-}"
 
 PASS=0
 FAIL=0
@@ -100,9 +102,9 @@ done
 
 # ─── 5. Variables de entorno documentadas en .env.example ────────────────────────
 
-header ".env.example: variables CODE_AGENT_*"
+header ".env.example: variables CODE_AGENT_* y TOKEN_AZURE"
 
-for var in CODE_AGENT_URL CODE_AGENT_TOKEN CODE_AGENT_TIMEOUT; do
+for var in CODE_AGENT_URL TOKEN_AZURE CODE_AGENT_TIMEOUT; do
     if grep -q "^$var=" .env.example; then
         green "$var en .env.example"
         PASS=$((PASS+1))
@@ -111,6 +113,14 @@ for var in CODE_AGENT_URL CODE_AGENT_TOKEN CODE_AGENT_TIMEOUT; do
         FAIL=$((FAIL+1))
     fi
 done
+
+if ! grep -q "^CODE_AGENT_TOKEN=" .env.example && ! grep -q "^AGENT_TOKEN=" .env.example; then
+    green "CODE_AGENT_TOKEN/AGENT_TOKEN eliminados de .env.example (consolidado en TOKEN_AZURE)"
+    PASS=$((PASS+1))
+else
+    red "CODE_AGENT_TOKEN o AGENT_TOKEN aún presentes en .env.example — deben eliminarse"
+    FAIL=$((FAIL+1))
+fi
 
 # ─── 6. Live tests — solo con --live y code-agent-mcp corriendo ──────────────────
 
@@ -314,6 +324,143 @@ if grep -q "update_pull_request_status" jira_mcp/rbac.py; then
 else
     red "update_pull_request_status NO en rbac.py"
     FAIL=$((FAIL+1))
+fi
+
+# ─── Endpoint /deployments/saz-workflow (nuevo REST endpoint) ────────────────────
+
+header "service/routes/deployment_workflow.py: router registrado"
+
+if grep -q "deployment_workflow_router" service/main.py; then
+    green "deployment_workflow_router incluido en service/main.py"
+    PASS=$((PASS+1))
+else
+    red "deployment_workflow_router NO incluido en service/main.py"
+    FAIL=$((FAIL+1))
+fi
+
+if grep -q "from .deployment_workflow import router" service/routes/__init__.py; then
+    green "router importado en service/routes/__init__.py"
+    PASS=$((PASS+1))
+else
+    red "router NO importado en service/routes/__init__.py"
+    FAIL=$((FAIL+1))
+fi
+
+header "schemas: DeploymentWorkflowRequest + DeploymentWorkflowResponse"
+
+if grep -q "class DeploymentWorkflowRequest" service/schemas/issue.py; then
+    green "DeploymentWorkflowRequest definido en service/schemas/issue.py"
+    PASS=$((PASS+1))
+else
+    red "DeploymentWorkflowRequest NO encontrado en service/schemas/issue.py"
+    FAIL=$((FAIL+1))
+fi
+
+if grep -q "class DeploymentWorkflowResponse" service/schemas/issue.py; then
+    green "DeploymentWorkflowResponse definido en service/schemas/issue.py"
+    PASS=$((PASS+1))
+else
+    red "DeploymentWorkflowResponse NO encontrado en service/schemas/issue.py"
+    FAIL=$((FAIL+1))
+fi
+
+for field in pr_id pr_url saz_key summary status; do
+    if grep -A30 "class DeploymentWorkflowResponse" service/schemas/issue.py | grep -q "$field"; then
+        green "Campo '$field' en DeploymentWorkflowResponse"
+        PASS=$((PASS+1))
+    else
+        red "Campo '$field' NO encontrado en DeploymentWorkflowResponse"
+        FAIL=$((FAIL+1))
+    fi
+done
+
+header "code_agent_client.py: función prepare_and_pr usa TOKEN_AZURE"
+
+if grep -q "TOKEN_AZURE" service/clients/code_agent_client.py; then
+    green "TOKEN_AZURE usado en code_agent_client.py"
+    PASS=$((PASS+1))
+else
+    red "TOKEN_AZURE NO encontrado en code_agent_client.py"
+    FAIL=$((FAIL+1))
+fi
+
+if ! grep -q "CODE_AGENT_TOKEN\|AGENT_TOKEN" service/clients/code_agent_client.py; then
+    green "CODE_AGENT_TOKEN/AGENT_TOKEN eliminados de code_agent_client.py"
+    PASS=$((PASS+1))
+else
+    red "CODE_AGENT_TOKEN o AGENT_TOKEN aún presentes en code_agent_client.py"
+    FAIL=$((FAIL+1))
+fi
+
+header "Live: /deployments/saz-workflow — validación de schema"
+
+if [ "$LIVE" = "1" ]; then
+    # Missing required fields → 422
+    MISSING=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVICE_URL_LOCAL/deployments/saz-workflow" \
+        -H "Content-Type: application/json" \
+        -d '{"repo": "ov-arizona-backend-ecuador"}' 2>&1)
+    if [ "$MISSING" = "422" ]; then
+        green "POST /deployments/saz-workflow sin campos requeridos → 422"
+        PASS=$((PASS+1))
+    else
+        red "POST /deployments/saz-workflow sin campos → HTTP $MISSING (esperado 422)"
+        FAIL=$((FAIL+1))
+    fi
+
+    # Empty required field → 422
+    EMPTY=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVICE_URL_LOCAL/deployments/saz-workflow" \
+        -H "Content-Type: application/json" \
+        -d '{"repo": "", "branch": "feature/test", "target": "test", "ticket": "ZNRX-00000", "task": "test task"}' 2>&1)
+    if [ "$EMPTY" = "422" ]; then
+        green "POST /deployments/saz-workflow con repo vacío → 422"
+        PASS=$((PASS+1))
+    else
+        red "POST /deployments/saz-workflow con repo vacío → HTTP $EMPTY (esperado 422)"
+        FAIL=$((FAIL+1))
+    fi
+
+    # code-agent-mcp not running → 502 (repo ficticio no registrado)
+    NOAGENT=$(curl -s "$SERVICE_URL_LOCAL/deployments/saz-workflow" \
+        -X POST -H "Content-Type: application/json" \
+        -d '{"repo": "nonexistent-repo-xyz", "branch": "feature/test", "target": "test", "ticket": "ZNRX-00000", "task": "test endpoint schema"}' 2>&1)
+    NOAGENT_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SERVICE_URL_LOCAL/deployments/saz-workflow" \
+        -H "Content-Type: application/json" \
+        -d '{"repo": "nonexistent-repo-xyz", "branch": "feature/test", "target": "test", "ticket": "ZNRX-00000", "task": "test endpoint schema"}' 2>&1)
+    if echo "$NOAGENT_CODE" | grep -q "^[45]"; then
+        green "POST /deployments/saz-workflow con repo inexistente → HTTP $NOAGENT_CODE (esperado 4xx/5xx)"
+        PASS=$((PASS+1))
+    else
+        red "POST /deployments/saz-workflow repo inexistente → HTTP $NOAGENT_CODE"
+        FAIL=$((FAIL+1))
+    fi
+
+    # Response structure — only test if code-agent-mcp is up
+    AGENT_HEALTH=$(curl -sf "$CODE_AGENT_URL/health" 2>/dev/null || echo "")
+    if echo "$AGENT_HEALTH" | grep -qi "ok"; then
+        echo "  (code-agent-mcp disponible — verificando estructura de respuesta con repo registrado)"
+        REPOS=$(curl -s "$CODE_AGENT_URL/repos" -H "X-Agent-Token: $TOKEN_AZURE" 2>/dev/null)
+        FIRST_REPO=$(echo "$REPOS" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['name'] if r else '')" 2>/dev/null || echo "")
+        if [ -n "$FIRST_REPO" ]; then
+            RESP=$(curl -s -X POST "$SERVICE_URL_LOCAL/deployments/saz-workflow" \
+                -H "Content-Type: application/json" \
+                -H "X-User: test-user" \
+                -d "{\"repo\": \"$FIRST_REPO\", \"branch\": \"feature/[MCP Claude Jira Test]\", \"target\": \"test\", \"ticket\": \"ZNRX-00000\", \"task\": \"[MCP Claude Jira Test] endpoint schema\"}" 2>&1)
+            for field in pr_id saz_key summary status; do
+                if echo "$RESP" | grep -q "\"$field\""; then
+                    green "Respuesta /deployments/saz-workflow contiene '$field'"
+                    PASS=$((PASS+1))
+                else
+                    red "Respuesta /deployments/saz-workflow NO contiene '$field'"
+                    echo "    Respuesta: $(echo "$RESP" | head -c 300)"
+                    FAIL=$((FAIL+1))
+                fi
+            done
+        else
+            echo "  (sin repos registrados en code-agent-mcp — omitiendo test de estructura de respuesta)"
+        fi
+    else
+        echo "  (code-agent-mcp no disponible — omitiendo test de respuesta real)"
+    fi
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────────

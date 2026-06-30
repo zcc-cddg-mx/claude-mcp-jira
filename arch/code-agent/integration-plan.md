@@ -10,7 +10,7 @@ genérica del code-agent original y descartando toda lógica específica del dom
 
 ---
 
-## Estado actual del `code-agent-mcp` (2026-06-25)
+## Estado actual del `code-agent-mcp` (2026-06-30)
 
 **133 tests.** Funcional e2e contra Azure DevOps (Zurich Insurance Ecuador) — PRs #2552–#2575 reales creados.
 
@@ -138,15 +138,21 @@ genérica del code-agent original y descartando toda lógica específica del dom
 6. update_jira_issue           → comentario con link PR + transición "In Review"
 ```
 
-### Flujo despliegue (Fase 12 — `create_deployment_saz_workflow`)
+### Flujo despliegue (Fase 12 — `create_deployment_saz_workflow` / `POST /deployments/saz-workflow`)
+
+Disponible como **MCP tool** y como **REST endpoint** del service layer. Ambas vías son equivalentes.
 
 ```
 [rama ya tiene cambios — no se necesita commit]
-1. get_repo_by_alias           → repo_path desde registry claude-mcp-jira
-2. create_azure_pull_request   → PR aux (feature/REQ → developer|test|develop)
-3. create_deployment_saz       → SAZ Jira con datos del PR (template determinista)
-   retorna → {pr_id, pr_url, aux_branch, saz_key, summary}
+1. prepare_and_pr              → PR aux (feature/REQ → developer|test|develop) vía code-agent-mcp
+2. render_deployment_saz       → template determinista SAZ (título + descripción)
+3. create_saz_issue            → SAZ Jira con datos del PR
+   retorna → {pr_id, pr_url, aux_branch, saz_key, summary, status}
 ```
+
+**REST endpoint:** `POST http://localhost:18000/deployments/saz-workflow`  
+Campos: `repo`, `branch`, `target`, `ticket`, `task`, `project_label` (default "OV"), `znrx_key` (opcional)  
+Respuesta 201: `DeploymentWorkflowResponse` con `pr_id`, `pr_url`, `aux_branch`, `saz_key`, `summary`, `status`
 
 ### Ciclo de vida de PR (Fase 12 — `update_pull_request_status`)
 
@@ -166,7 +172,7 @@ Cliente httpx hacia `code-agent-mcp`. Variables de entorno:
 
 ```
 CODE_AGENT_URL=http://code-agent-mcp:5001
-CODE_AGENT_TOKEN=                         # mismo valor que TOKEN_AZURE del agente
+TOKEN_AZURE=                              # PAT Azure DevOps; enviado como X-Agent-Token
 CODE_AGENT_TIMEOUT=30
 ```
 

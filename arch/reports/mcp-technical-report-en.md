@@ -22,7 +22,7 @@ The system operates as a **specialized Ecuador Agent** — equivalent to Zurich 
 | **Workflow Orchestrator** | 6 orchestrated steps: commit → branch → PR → CI → Jira | ❌ No |
 | **Azure DevOps EC** | Integration with tenant `ZurichInsurance-EC / Oficina-Virtual-ZEC` | ❌ No |
 
-**Current state:** 19 MCP tools · 232 tests · end-to-end validation with real PRs and SAZ tickets · 100% Zurich internal network.
+**Current state:** 19 MCP tools · 240 tests · end-to-end validation with real PRs and SAZ tickets · 100% Zurich internal network.
 
 ---
 
@@ -157,6 +157,8 @@ create_deployment_saz_workflow(
 → SAZ-7442 created: "Despliegue ambiente TEST - OV - Limite Autos - Backend Ecuador"
 ```
 
+Also available as a direct REST endpoint: `POST /deployments/saz-workflow` (service layer :18000).
+
 ### 3.5 Workflow Orchestrator (2 tools)
 
 | Tool | Min. Role | Description |
@@ -178,7 +180,7 @@ create_deployment_saz_workflow(
 | Safe JQL | Claude → struct → controlled builder; `_jql_escape` on all fields; MAX 50 |
 | Pre-validation | Rejects empty inputs or inputs > 2000 chars before hitting the backend |
 | Normalized output | LLM only receives `{key, status}` or `{key, summary}` — no internal data |
-| code-agent token | `X-Agent-Token` separate from `JIRA_PAT`; value in `CODE_AGENT_TOKEN` env var |
+| code-agent token | `X-Agent-Token` separate from `JIRA_PAT`; value in `TOKEN_AZURE` (single consolidated variable) |
 | SSE timeout | `asyncio.wait_for` with `MCP_SSE_TIMEOUT=300s` |
 
 ---
@@ -206,9 +208,9 @@ create_deployment_saz_workflow(
 | `test-multi.sh` | 19 e2e | Multi-project + auto-discovery |
 | `test-actions.sh` | 24 e2e | comments, assign, priority, labels, worklog, transition, clone, link, SAZ |
 | `test-git.sh` | 26 e2e | Git registry CRUD + sync dry_run |
-| `test-code-agent.sh` | 49 schema+live | Phases 10/11/12: tools, dispatch, RBAC |
+| `test-code-agent.sh` | 57 schema+live | Phases 10/11/12 + `/deployments/saz-workflow` endpoint: tools, dispatch, RBAC, token consolidation |
 | `pytest tests/` | 96 unit | sanitizer, jql_builder, auth, rbac, git_analyzer, git_mapper, jira_pat_routing |
-| **Total** | **232** | |
+| **Total** | **240** | |
 
 Real flows validated: PRs #2574/#2575 in Azure DevOps · SAZ-7441/7442 in Jira · ZNRX-68298 via global MCP.
 
@@ -288,7 +290,7 @@ claude-mcp-jira  [Ecuador Agent — orchestration + specialization]
 conda env create -f environment.yml
 conda activate claude-mcp-jira
 cp .env.example .env
-# Fill in: JIRA_PAT, MCP_API_KEY, CODE_AGENT_TOKEN
+# Fill in: JIRA_PAT, MCP_API_KEY, TOKEN_AZURE
 # Uncomment: REQUESTS_CA_BUNDLE=certs/zurichseguros-rootca-until-2031_03_20.crt
 
 # Full stack

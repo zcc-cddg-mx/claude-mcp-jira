@@ -1,6 +1,6 @@
 # TODO — claude-mcp-jira
 
-Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 10, 11 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+32 e2e + 96 unit.
+Estado general: Fases 1–5, 7, 8a, 9.1–9.4, 9.5a, 10, 11, 12 completas. Deuda técnica H1-H9 cerrada. Tests: 8+10+19+24+26+57 e2e + 96 unit = 240 total.
 Próximas: Fase 8 UI (condicional a adopción no-técnica) · Fase 6 Observabilidad (condicional a volumen).
 Actualizar este archivo al completar o añadir tareas.
 
@@ -17,11 +17,6 @@ Actualizar este archivo al completar o añadir tareas.
 ### Implementación
 
 
-
-- [ ] **Tests live Fase 11** *(bajo — requiere code-agent-mcp corriendo)*
-  - Ejecutar `bash scripts/test-code-agent.sh --live` con `CODE_AGENT_URL` apuntando a una instancia del agente
-  - Verificar flujo completo: `run_code_agent` → `get_code_agent_status` → `create_azure_pull_request` → `get_pull_request_status`
-  - Nota: code-agent-mcp ahora expone `steps` por paso en `GET /status/<id>` — considerar exponer en `get_code_agent_status` MCP tool
 
 - [ ] **Fase 8 — UI (Streamlit MVP)** *(futura — requiere demanda no-técnica validada)*
   - Evaluación: `arch/evaluations/eval-workflow-copilot.md` sección 5 y `arch/evaluations/eval-orchestrator-copilot.md`
@@ -152,6 +147,20 @@ Actualizar este archivo al completar o añadir tareas.
   - `.env.example` — sección `CODE AGENT MCP`: `CODE_AGENT_URL`, `CODE_AGENT_TOKEN`, `CODE_AGENT_TIMEOUT`
   - `code-agent-mcp` ya funcional (73 tests, PRs #2552-2554 reales); claude-mcp-jira ahora orquesta flujo completo Jira → git → PR Azure
 - [x] `JIRA_ALLOWED_PROJECTS` vaciado (2026-06-25) — seguridad delegada al PAT de Jira y token Azure; Fase 8 UI poblará la lista según proyectos accesibles por PAT del usuario
+- [x] Fase 12 — Deployment SAZ workflow + PR lifecycle (2026-06-25/2026-06-30):
+  - `jira_mcp/server.py` — 3 tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`
+  - `jira_mcp/service_client.py` — `update_pull_request_status()`, `get_repo_by_alias()`, `set_repo_branch_map()`
+  - `jira_mcp/rbac.py` — 3 tools añadidos a roles `lead` y `system`
+  - `service/clients/saz_template.py` — `_TARGET_BASE_BRANCH` dict + `get_base_branch_for_target()`
+  - `service/routes/deployment_workflow.py` — **NUEVO** endpoint `POST /deployments/saz-workflow`
+  - `service/schemas/issue.py` — `DeploymentWorkflowRequest` + `DeploymentWorkflowResponse`
+  - `scripts/test-code-agent.sh` — 57/57 tests (schema Fase 12 + endpoint REST + validación token consolidado)
+  - PRs #2574/#2575 (DEVELOPER/TEST) + SAZ-7441/7442 reales creados y entregados al equipo DevOps
+- [x] Consolidación token code-agent (2026-06-30):
+  - `CODE_AGENT_TOKEN` y `AGENT_TOKEN` eliminados — solo `TOKEN_AZURE` en `.env` y `.env.example`
+  - `service/clients/code_agent_client.py` — `_client()` lee `os.environ.get("TOKEN_AZURE")` directamente
+  - `jira_mcp/service_client.py` — `_agent_client()` lee `os.environ.get("TOKEN_AZURE")` directamente
+  - Motivo: python-dotenv no expande interpolaciones `${VAR}` — tres variables idénticas causaban 401s repetidos
 - [x] Verificación empírica Sub-tasks ZNRX (2026-06-25):
   - `issuetype.id=18124` (`Subtarea Historia`) + `parent.key` + **sin** `customfield_25832` → ✅ crea correctamente
   - `issuetype: {"name": "Sub-task"}` → 400 (no existe en ZNRX)

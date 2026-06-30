@@ -234,3 +234,22 @@ class CreateSAZResponse(BaseModel):
     znrx_key: Optional[str] = None
     summary: str
     status: str
+
+
+class DeploymentWorkflowRequest(BaseModel):
+    repo: str = Field(..., min_length=1, max_length=200, example="ov-arizona-backend-ecuador")
+    branch: str = Field(..., min_length=1, max_length=255, example="feature/RITM2526375_renov_agosto")
+    target: str = Field(..., min_length=1, max_length=50, example="prod")
+    ticket: str = Field(..., min_length=1, max_length=50, example="RITM2526375")
+    task: str = Field(..., min_length=1, max_length=120, example="Renovacion Agosto - Backend Ecuador")
+    project_label: str = Field("OV", max_length=50, example="OV - Backend Ecuador")
+    znrx_key: Optional[str] = Field(None, pattern=r'^[A-Z][A-Z0-9]+-\d+$', example="ZNRX-67926")
+
+
+class DeploymentWorkflowResponse(BaseModel):
+    pr_id: int
+    pr_url: str
+    aux_branch: Optional[str] = None
+    saz_key: str
+    summary: str
+    status: str

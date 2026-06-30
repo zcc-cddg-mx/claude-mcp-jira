@@ -31,7 +31,7 @@ Three-layer design — CLI and MCP server never call Claude or Jira directly:
 ```bash
 conda env create -f environment.yml
 conda activate claude-mcp-jira
-cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY, CODE_AGENT_TOKEN and uncomment REQUESTS_CA_BUNDLE
+cp .env.example .env  # fill in JIRA_PAT, MCP_API_KEY, TOKEN_AZURE and uncomment REQUESTS_CA_BUNDLE
 ```
 
 ## Running
@@ -52,8 +52,8 @@ bash scripts/test-mcp.sh          # e2e MCP server: 10 tests (tools + auth + RBA
 bash scripts/test-multi.sh        # e2e multi-proyecto: 19 tests (ZNRX/AIPROJECTS/SAZ + auto-discovery)
 bash scripts/test-actions.sh      # e2e endpoints de acción: 24 tests (comments, assign, priority, labels, worklog, transition, clone, link, saz)
 bash scripts/test-git.sh          # e2e Git Intelligence: 26 tests (repos CRUD + sync dry_run)
-bash scripts/test-code-agent.sh   # Fase 10+11+12 schema/dispatch: 49 tests (sin requerir code-agent-mcp corriendo)
-bash scripts/test-code-agent.sh --live  # live e2e con code-agent-mcp en CODE_AGENT_URL
+bash scripts/test-code-agent.sh   # Fase 10+11+12 + /deployments/saz-workflow: 57 tests (schema/dispatch/endpoint)
+bash scripts/test-code-agent.sh --live  # live e2e con service layer :18000 + code-agent-mcp :5001
 pytest tests/                     # tests unitarios: 96 tests (sanitizer, jql, auth, rbac, git_analyzer, git_mapper, jira_pat_routing)
 
 # CLI commands
@@ -101,6 +101,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | `POST` | `/issues/{key}/actions` | Acciones de largo plazo (add_watcher, etc.) — 501 |
 | `POST` | `/issues/saz` | Crear ticket SAZ (DevOps/Release); `znrx_key` opcional para vincularlo |
 | `POST` | `/issues/saz/deployment` | Crear SAZ de despliegue desde datos de PR (template determinista, sin Claude); campos: `task`, `repo`, `target`, `branch`, `base_branch`, `pr_id`, `pr_url`, `project_label`, `znrx_key` (opcional) |
+| `POST` | `/deployments/saz-workflow` | **Workflow completo en una llamada**: crea PR en Azure (via code-agent-mcp) + SAZ de despliegue; campos: `repo`, `branch`, `target`, `ticket`, `task`, `project_label` (default "OV"), `znrx_key` (opcional) |
 | `GET` | `/projects` | Lista proyectos registrados en DB (seed + auto-descubiertos) |
 | `GET` | `/projects/{key}` | Config de un proyecto; dispara auto-discovery desde Jira si no existe en DB |
 | `GET` | `/health` | Health check |
@@ -151,7 +152,7 @@ Both dev and Docker expose port 18001 on the host (Docker maps 18001→8001 insi
 | Output normalizado | MCP server | LLM solo recibe `{key,status}` o `{key,summary}` |
 | SSE timeout | MCP server | `asyncio.wait_for` con `MCP_SSE_TIMEOUT=300s` |
 | Tests unitarios | `tests/` | 96 tests: sanitizer, jql_builder, auth, rbac, git_analyzer, git_mapper, jira_pat_routing |
-| code-agent-mcp token | MCP server | `X-Agent-Token` en `_agent_client()` — separado del `JIRA_PAT`; valor en `CODE_AGENT_TOKEN` |
+| code-agent-mcp token | MCP server | `X-Agent-Token` en `_agent_client()` — separado del `JIRA_PAT`; valor en `TOKEN_AZURE` |
 
 ## Jira Auth (Server/DC)
 
@@ -210,7 +211,7 @@ Generate a PAT at `jira.zurich.com` → Profile → Personal Access Tokens. Set 
 | 9.5b — Human factors + learning layer | Futura | Señales contextuales interactivas + multiplier factors por usuario — requiere Fase 10 + UI |
 | 10 — Workflow Orchestrator | ✅ Completa | `workflow_store.py` + `routes/workflows.py` + 2 MCP tools (`run_create_feature_pr_workflow`, `get_workflow_status`); 4 REST endpoints + 6-step polling engine; 32 schema tests |
 | 11 — Integración code-agent-mcp | ✅ Completa | `service/clients/code_agent_client.py` + 4 MCP tools (run/status/pr/pr-status); delega git ops y Azure PR al code-agent-mcp |
-| 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; 49/49 schema tests |
+| 12 — Deployment SAZ workflow + PR lifecycle | ✅ Completa | 3 MCP tools nuevos: `create_deployment_saz_workflow`, `update_pull_request_status`, `set_repo_branch_map`; mapping ambiente→rama; `ticket` acepta Jira key o ID requerimiento; `POST /deployments/saz-workflow` REST endpoint; 57/57 schema tests |
 | Eval — Zurich Global MCP | ✅ Completa | `et-ai-mcp-jira` evaluado: CRUD básico ✅, worklog/link/assign/SAZ ❌; decisión: mantener claude-mcp-jira; ticket referencia ZNRX-68298 |
 
 ## code-agent-mcp — estrategia de integración de endpoints

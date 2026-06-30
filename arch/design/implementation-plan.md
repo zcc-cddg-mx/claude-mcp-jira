@@ -682,7 +682,7 @@ Delegado a code-agent-mcp via `PATCH /repos/<name>/branch-map` + `resolve_target
 - `{destino}` en plantilla SAZ usa `target` (rama de integración), no `base_branch` — es lo que DevOps necesita ver
 - Workflow es sincrónico (no polling) — `POST /azure/prepare-and-pr` retorna directo
 
-### Archivos modificados
+### Archivos modificados / creados
 
 | Archivo | Cambio |
 |---|---|
@@ -690,7 +690,11 @@ Delegado a code-agent-mcp via `PATCH /repos/<name>/branch-map` + `resolve_target
 | `jira_mcp/service_client.py` | `update_pull_request_status()`, `get_repo_by_alias()`, `set_repo_branch_map()` |
 | `jira_mcp/rbac.py` | 3 tools añadidos a roles `lead` y `system` |
 | `service/clients/saz_template.py` | `_TARGET_BASE_BRANCH` dict + `get_base_branch_for_target()` + fix `{destino}` usa `target` |
-| `scripts/test-code-agent.sh` | 45/45 tests (4 secciones nuevas para Fase 12) |
+| `service/routes/deployment_workflow.py` | **NUEVO** — `POST /deployments/saz-workflow`; orquesta `prepare_and_pr` + `render_deployment_saz` + `create_saz_issue` |
+| `service/schemas/issue.py` | `DeploymentWorkflowRequest` + `DeploymentWorkflowResponse` |
+| `service/clients/code_agent_client.py` | Token consolidado: lee `TOKEN_AZURE` directo (eliminados `CODE_AGENT_TOKEN`/`AGENT_TOKEN`) |
+| `jira_mcp/service_client.py` | `_agent_client()` lee `TOKEN_AZURE` directo |
+| `scripts/test-code-agent.sh` | 57/57 tests (secciones Fase 12 + endpoint REST + validación token consolidado) |
 
 ### Criterio de éxito
 
@@ -704,11 +708,11 @@ PRs #2574 (DEVELOPER) y #2575 (TEST) + SAZ-7441 y SAZ-7442 creados en Azure DevO
 
 ### Nuevo módulo: `service/clients/code_agent_client.py`
 
-Cliente httpx hacia `code-agent-mcp`. Auth: `X-Agent-Token: {CODE_AGENT_TOKEN}`.
+Cliente httpx hacia `code-agent-mcp`. Auth: `X-Agent-Token: {TOKEN_AZURE}`.
 
 ```python
 CODE_AGENT_URL=http://code-agent-mcp:5001   # default
-CODE_AGENT_TOKEN=                            # mismo valor que TOKEN_AZURE del agente
+TOKEN_AZURE=                                 # PAT Azure DevOps; enviado como X-Agent-Token
 CODE_AGENT_TIMEOUT=30
 ```
 
@@ -730,7 +734,7 @@ Funciones: `run_task()`, `get_task_status()`, `prepare_and_pr()`, `get_pr_status
 ### Criterio de éxito
 
 ```bash
-bash scripts/test-code-agent.sh   # 19/19 tests (schema, dispatch, funciones, env vars)
+bash scripts/test-code-agent.sh   # 57/57 tests (schema, dispatch, funciones, env vars, endpoint /deployments/saz-workflow)
 ```
 
 Flujo completo validado con PRs #2552–#2554 reales en Azure DevOps Zurich Insurance Ecuador.

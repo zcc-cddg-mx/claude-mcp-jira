@@ -237,23 +237,24 @@ def get_code_agent_status(task_id: str) -> dict:
 
 def create_azure_pull_request(
     repo: str,
-    repo_path: str,
     branch: str,
-    files: list,
     target: str,
     ticket: str,
     title: str,
+    repo_path: Optional[str] = None,
+    files: Optional[list] = None,
     description: str = "",
 ) -> dict:
     body: dict = {
         "repo": repo,
-        "repo_path": repo_path,
         "branch": branch,
         "target": target,
         "ticket": ticket,
         "title": title,
         "description": description,
     }
+    if repo_path:
+        body["repo_path"] = repo_path
     if files:
         body["files"] = files  # omit when empty → code-agent auto-detects
     with _agent_client() as c:
@@ -326,11 +327,15 @@ def create_deployment_saz(
 
 def preview_code_agent(
     repo: str,
-    repo_path: str,
     target: str = "developer",
+    repo_path: Optional[str] = None,
     files: Optional[list] = None,
 ) -> dict:
-    body: dict = {"repo": repo, "repo_path": repo_path, "target": target, "files": files or []}
+    body: dict = {"repo": repo, "target": target}
+    if repo_path:
+        body["repo_path"] = repo_path
+    if files:
+        body["files"] = files
     with _agent_client() as c:
         r = c.post("/azure/prepare-and-pr/preview", json=body)
         r.raise_for_status()
@@ -346,21 +351,22 @@ def preview_code_agent(
 def create_workflow(
     issue_key: str,
     repo: str,
-    repo_path: str,
     target: str,
     commit_message: str,
     files: list,
     user: str,
+    repo_path: Optional[str] = None,
     jira_token: Optional[str] = None,
 ) -> dict:
-    body = {
+    body: dict = {
         "issue_key": issue_key,
         "repo": repo,
-        "repo_path": repo_path,
         "target": target,
         "commit_message": commit_message,
         "files": files,
     }
+    if repo_path:
+        body["repo_path"] = repo_path
     with _client(user, jira_token) as c:
         r = c.post("/workflows/create-feature-pr", json=body)
         r.raise_for_status()

@@ -370,7 +370,11 @@ def _make_tools() -> list[Tool]:
         ),
         Tool(
             name="create_azure_pull_request",
-            description="Idempotent: ensure auxiliary branch exists/is up-to-date and find or create the auxiliary PR in Azure DevOps. Returns action (created/updated/unchanged), pr_id, pr_url.",
+            description=(
+                "Idempotent: ensure auxiliary branch exists/is up-to-date and find or create the auxiliary PR in Azure DevOps. "
+                "Returns action (created/updated/unchanged), pr_id, pr_url. "
+                "repo_path and files are optional if the repo is registered in code-agent-mcp with local_path."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -378,22 +382,13 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Azure DevOps repository name (e.g. ov-arizona-backend-ecuador)",
                     },
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Absolute local path to the git clone on the code-agent server (e.g. /home/idavid/dev/ov/ov-arizona-backend-ecuador)",
-                    },
                     "branch": {
                         "type": "string",
                         "description": "Feature branch (source of files, e.g. feature/ZNRX_67108_renov_agosto)",
                     },
-                    "files": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Absolute paths of files to integrate into the aux branch",
-                    },
                     "target": {
                         "type": "string",
-                        "description": "Integration branch — the PR target (e.g. developer, test)",
+                        "description": "Logical target environment: developer, test, or prod. Resolved to actual branch via per-repo branch_map.",
                     },
                     "ticket": {
                         "type": "string",
@@ -404,13 +399,22 @@ def _make_tools() -> list[Tool]:
                         "description": "PR title (e.g. 'ZNRX-67108 Renovaciones junio → test')",
                         "maxLength": 300,
                     },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Optional: absolute local path to the git clone on the code-agent server. Not needed if the repo was registered with local_path.",
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional: absolute paths of files to integrate. Omit to auto-detect from git diff.",
+                    },
                     "description": {
                         "type": "string",
                         "description": "Optional PR description",
                         "maxLength": max_len,
                     },
                 },
-                "required": ["repo", "repo_path", "branch", "files", "target", "ticket", "title"],
+                "required": ["repo", "branch", "target", "ticket", "title"],
             },
         ),
         Tool(
@@ -435,7 +439,8 @@ def _make_tools() -> list[Tool]:
             name="run_create_feature_pr_workflow",
             description=(
                 "Run the full CreateFeaturePR workflow: preview → git agent → PR → CI wait → link Jira. "
-                "Executes all steps sequentially and returns the final execution state with branch, pr_id and pr_url."
+                "Executes all steps sequentially and returns the final execution state with branch, pr_id and pr_url. "
+                "repo_path is optional if the repo is registered in code-agent-mcp with local_path."
             ),
             inputSchema={
                 "type": "object",
@@ -448,23 +453,23 @@ def _make_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Azure DevOps repository name (e.g. ov-arizona-backend-ecuador)",
                     },
-                    "repo_path": {
-                        "type": "string",
-                        "description": "Absolute path to the repo on the code-agent server (e.g. /repos/ov-arizona-backend-ecuador)",
-                    },
-                    "target": {
-                        "type": "string",
-                        "description": "Integration branch to target (default: developer)",
-                    },
                     "commit_message": {
                         "type": "string",
                         "description": "Commit message for the feature branch",
                         "maxLength": 500,
                     },
+                    "target": {
+                        "type": "string",
+                        "description": "Logical target environment: developer, test, or prod (default: developer)",
+                    },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Optional: absolute path to the repo on the code-agent server. Not needed if registered with local_path.",
+                    },
                     "files": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Files to stage. Leave empty to auto-detect via preview dry-run.",
+                        "description": "Optional: files to stage. Leave empty to auto-detect via preview dry-run.",
                     },
                     "create_saz": {
                         "type": "boolean",
@@ -485,7 +490,7 @@ def _make_tools() -> list[Tool]:
                         "description": "Optional Jira PAT to act as a specific user.",
                     },
                 },
-                "required": ["issue_key", "repo", "repo_path", "commit_message"],
+                "required": ["issue_key", "repo", "commit_message"],
             },
         ),
         Tool(
@@ -624,19 +629,18 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
         return {"status": "failed", "error": f"Repo '{repo_alias}' not found in registry: {e}"}
 
     # Step 2 — create PR via code-agent-mcp (idempotent)
-    # base_branch is resolved by code-agent-mcp using per-repo branch_map
+    # repo_path and files omitted — resolved from code-agent-mcp registry (local_path + auto-detect)
     env_upper = target.upper()
     pr_title = f"{ticket} {task} → {env_upper}"
 
     try:
         pr_result = service_client.create_azure_pull_request(
             repo=repo_name,
-            repo_path=repo_path,
             branch=branch,
-            files=[],
             target=target,
             ticket=ticket,
             title=pr_title,
+            repo_path=repo_path,
         )
         pr_id = pr_result["pr_id"]
         pr_url = pr_result.get("pr_url", "")
@@ -683,7 +687,7 @@ async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_t
 async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token: str | None) -> dict:
     issue_key = arguments["issue_key"]
     repo = arguments["repo"]
-    repo_path = arguments["repo_path"]
+    repo_path = arguments.get("repo_path")
     target = arguments.get("target", "developer")
     commit_message = arguments["commit_message"]
     files = arguments.get("files") or []
@@ -695,11 +699,11 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
     execution = service_client.create_workflow(
         issue_key=issue_key,
         repo=repo,
-        repo_path=repo_path,
         target=target,
         commit_message=commit_message,
         files=files,
         user=user,
+        repo_path=repo_path,
         jira_token=jira_token,
     )
     eid = execution["execution_id"]
@@ -715,7 +719,7 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
         steps.append(_step("preview", "running"))
         _persist()
         preview = service_client.preview_code_agent(
-            repo=repo, repo_path=repo_path, target=target, files=files
+            repo=repo, target=target, repo_path=repo_path or None, files=files or None
         )
         if not files:
             files = preview.get("files_detected", [])
@@ -768,12 +772,12 @@ async def _run_create_feature_pr_workflow(arguments: dict, user: str, jira_token
         _persist()
         pr_result = service_client.create_azure_pull_request(
             repo=repo,
-            repo_path=repo_path,
             branch=branch,
-            files=files,
             target=target,
             ticket=issue_key,
             title=f"{issue_key} {commit_message[:80]}",
+            repo_path=repo_path or None,
+            files=files or None,
         )
         pr_id = pr_result["pr_id"]
         pr_url = pr_result.get("pr_url", "")
@@ -923,12 +927,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         elif name == "create_azure_pull_request":
             result = service_client.create_azure_pull_request(
                 repo=arguments["repo"],
-                repo_path=arguments["repo_path"],
                 branch=arguments["branch"],
-                files=arguments["files"],
                 target=arguments["target"],
                 ticket=arguments["ticket"],
                 title=arguments["title"],
+                repo_path=arguments.get("repo_path"),
+                files=arguments.get("files"),
                 description=arguments.get("description", ""),
             )
         elif name == "get_pull_request_status":

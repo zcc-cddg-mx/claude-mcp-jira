@@ -69,24 +69,26 @@ def get_task_status(task_id: str) -> dict:
 
 def prepare_and_pr(
     repo: str,
-    repo_path: str,
     branch: str,
-    files: list[str],
     target: str,
     ticket: str,
     title: str,
+    repo_path: Optional[str] = None,
+    files: Optional[list[str]] = None,
     description: str = "",
 ) -> dict:
-    body = {
+    body: dict = {
         "repo": repo,
-        "repo_path": repo_path,
         "branch": branch,
-        "files": files,
         "target": target,
         "ticket": ticket,
         "title": title,
         "description": description,
     }
+    if repo_path:
+        body["repo_path"] = repo_path
+    if files:
+        body["files"] = files
     with _client() as c:
         r = c.post("/azure/prepare-and-pr", json=body)
         r.raise_for_status()

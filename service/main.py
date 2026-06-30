@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
-load_dotenv(override=True)
+load_dotenv()  # shell env vars take precedence over .env
 
 from .routes import actions_router, assign_router, clone_router, comments_router, deployment_workflow_router, git_repos_router, git_sync_router, issues_router, labels_router, link_meta_router, link_router, priority_router, projects_router, saz_router, search_router, summarize_router, transitions_router, update_router, worklog_router, workflows_router
 from .clients.project_db import init_db, seed

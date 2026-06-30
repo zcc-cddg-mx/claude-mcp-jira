@@ -22,9 +22,11 @@ PIDFILE_MCP=/tmp/mcp-jira-mcp.pid
 LOG_SERVICE=/tmp/mcp-jira-service.log
 LOG_MCP=/tmp/mcp-jira-mcp.log
 
-export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-export AUDIT_LOG_PATH=/tmp/audit.log
-export SERVICE_URL=http://localhost:$SERVICE_PORT
+# Respetar overrides del entorno si ya están definidos (ej: run_local.sh los establece antes)
+export REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}"
+export AUDIT_LOG_PATH="${AUDIT_LOG_PATH:-/tmp/mcp-jira-audit.log}"
+export SERVICE_URL="${SERVICE_URL:-http://localhost:$SERVICE_PORT}"
+export APP_ENV="${APP_ENV:-dev}"
 export MCP_PORT=$MCP_PORT
 export JIRA_TIMEOUT=30
 

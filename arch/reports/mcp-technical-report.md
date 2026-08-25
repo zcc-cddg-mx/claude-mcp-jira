@@ -1,8 +1,8 @@
 # Informe Técnico: claude-mcp-jira
 # Agente de Automatización de Desarrollo — Zurich Insurance Ecuador
 
-**Versión**: 2.0  
-**Fecha**: Junio 2026  
+**Versión**: 2.1  
+**Fecha**: Agosto 2026  
 **Equipo**: Desarrollo Zurich Insurance Ecuador  
 **Contacto**: carlos.duarte2@mx.zurich.com
 
@@ -22,7 +22,7 @@ El sistema opera como un **Agente especializado Ecuador** — equivalente al con
 | **Workflow Orchestrator** | 6 pasos orquestados: commit → rama → PR → CI → Jira | ❌ No |
 | **Azure DevOps EC** | Integración con tenant `ZurichInsurance-EC / Oficina-Virtual-ZEC` | ❌ No |
 
-**Estado actual:** 19 MCP tools operativos · 240 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich.
+**Estado actual:** 20 MCP tools operativos · 240 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich.
 
 ---
 
@@ -92,7 +92,7 @@ El transporte SSE (Server-Sent Events) permite que el servidor MCP viva en la re
 
 ---
 
-## 3. Capacidades del sistema (19 MCP tools)
+## 3. Capacidades del sistema (20 MCP tools)
 
 ### 3.1 Gestión Jira (9 tools)
 
@@ -108,7 +108,7 @@ El transporte SSE (Server-Sent Events) permite que el servidor MCP viva en la re
 | `set_priority_jira_issue` | lead | Cambia prioridad desde texto |
 | `create_saz_request` | lead | Crea ticket SAZ; `znrx_key` opcional para vincular a requerimiento |
 
-### 3.2 Git Intelligence (3 tools)
+### 3.2 Git Intelligence (4 tools)
 
 Funcionalidad diferencial — no existe equivalente en el ecosistema global Zurich.
 
@@ -117,6 +117,7 @@ Funcionalidad diferencial — no existe equivalente en el ecosistema global Zuri
 | `register_git_repo` | Registra alias de repo local → path + proyecto Jira |
 | `list_git_repos` | Lista repos registrados |
 | `sync_git_worklogs` | Escanea commits por autor/período → detecta sesiones de trabajo → registra worklogs en Jira; `dry_run=true` por defecto; Claude humanizer ajusta estimaciones semánticamente |
+| `report_git_worklogs` | Solo lectura: ejecuta `sync_git_worklogs(dry_run=True)` y retorna tabla agrupada por ticket (`Ticket · Horas · Commits · Confianza`); `since_days` default 7 |
 
 **Flujo típico:**
 ```

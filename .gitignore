@@ -5,3 +5,5 @@ __pycache__/
 *.pyo
 .pytest_cache/
 logs/
+projects.db
+proyectos/

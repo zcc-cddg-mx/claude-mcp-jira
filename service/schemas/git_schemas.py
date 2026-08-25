@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 class GitSyncRequest(BaseModel):
     repo_path: Optional[str] = Field(None, min_length=1, max_length=500, example="/home/user/repos/auth-service")
     repo_name: Optional[str] = Field(None, min_length=1, max_length=100, description="Registered repo alias (resolves path and defaults from registry)")
-    since_days: int = Field(1, ge=1, le=30, example=1)
+    since_days: int = Field(1, ge=1, le=365, example=1)
     dry_run: bool = Field(True, description="If true, returns preview only — does not register worklogs in Jira")
     author: Optional[str] = Field(None, min_length=1, max_length=200, description="Filter commits by author email")
 

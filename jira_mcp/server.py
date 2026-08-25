@@ -292,6 +292,39 @@ def _make_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="report_git_worklogs",
+            description="Read a local Git repository and generate a work-hours report grouped by Jira ticket. Read-only — does not register anything in Jira. Use this to review estimated hours before running sync_git_worklogs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "repo_name": {
+                        "type": "string",
+                        "description": "Registered repo alias (e.g. 'auth-service'). Mutually exclusive with repo_path.",
+                    },
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Absolute path to the local Git repository. Mutually exclusive with repo_name.",
+                    },
+                    "since_days": {
+                        "type": "integer",
+                        "description": "How many days back to scan commits (default: 7)",
+                        "default": 7,
+                        "minimum": 1,
+                        "maximum": 30,
+                    },
+                    "author": {
+                        "type": "string",
+                        "description": "Optional: filter commits by author email",
+                    },
+                    "jira_token": {
+                        "type": "string",
+                        "description": "Optional Jira PAT to act as a specific user instead of the service account.",
+                    },
+                },
+                "required": [],
+            },
+        ),
+        Tool(
             name="create_saz_request",
             description="Create a SAZ ticket (Solicitud Release Zurich) for DevOps/Release team requests: service restarts, deployments, Git repo management, infrastructure access, environment promotions. Optionally link to a ZNRX ticket.",
             inputSchema={
@@ -610,6 +643,63 @@ _CI_POLL_MAX = int(os.environ.get("WORKFLOW_CI_POLL_MAX", "120"))
 
 def _step(name: str, status: str, detail: str | None = None) -> dict:
     return {"name": name, "status": status, "detail": detail}
+
+
+async def _run_report_git_worklogs(arguments: dict, user: str, jira_token: str | None) -> str:
+    since_days = int(arguments.get("since_days", 7))
+    data = service_client.sync_git_worklogs(
+        repo_path=arguments.get("repo_path") or None,
+        repo_name=arguments.get("repo_name") or None,
+        user=user,
+        since_days=since_days,
+        dry_run=True,
+        author=arguments.get("author") or None,
+        jira_token=jira_token,
+    )
+
+    sessions = data.get("sessions", [])
+    repo = data.get("repo_path") or arguments.get("repo_name") or arguments.get("repo_path") or "?"
+    branch = data.get("branch") or ""
+    total_commits = data.get("total_commits", 0)
+
+    _conf_rank = {"high": 2, "medium": 1, "low": 0}
+    groups: dict[str, dict] = {}
+    for s in sessions:
+        key = s.get("issue_key") or "Sin ticket"
+        if key not in groups:
+            groups[key] = {"hours": 0.0, "commits": 0, "messages": [], "confidence": "low"}
+        groups[key]["hours"] += s.get("estimated_hours", 0.0)
+        groups[key]["commits"] += s.get("commit_count", 0)
+        groups[key]["messages"].extend(s.get("messages", []))
+        s_conf = s.get("confidence", "low")
+        if _conf_rank.get(s_conf, 0) > _conf_rank.get(groups[key]["confidence"], 0):
+            groups[key]["confidence"] = s_conf
+
+    total_hours = sum(g["hours"] for g in groups.values())
+    _conf_es = {"high": "alta", "medium": "media", "low": "baja"}
+
+    lines = [
+        f"## Reporte de horas — {repo}",
+        f"Rama: `{branch}` | Últimos {since_days} días | {total_commits} commits\n",
+        "| Ticket | Horas | Commits | Confianza |",
+        "|--------|-------|---------|-----------|",
+    ]
+    for key, g in sorted(groups.items(), key=lambda x: -x[1]["hours"]):
+        conf = _conf_es.get(g["confidence"], g["confidence"])
+        lines.append(f"| {key} | {g['hours']:.2f}h | {g['commits']} | {conf} |")
+    lines.append(f"| **Total** | **{total_hours:.2f}h** | **{total_commits}** | |")
+
+    lines.append("\n### Detalle por ticket\n")
+    for key, g in sorted(groups.items(), key=lambda x: -x[1]["hours"]):
+        lines.append(f"**{key}** ({g['hours']:.2f}h)")
+        msgs = g["messages"]
+        for msg in msgs[:5]:
+            lines.append(f"- {msg[:100]}")
+        if len(msgs) > 5:
+            lines.append(f"- ... y {len(msgs) - 5} commits más")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 async def _run_create_deployment_saz_workflow(arguments: dict, user: str, jira_token: str | None) -> dict:
@@ -957,6 +1047,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 author=arguments.get("author"),
                 jira_token=jira_token,
             )
+        elif name == "report_git_worklogs":
+            report_text = await _run_report_git_worklogs(arguments, user, jira_token)
+            _audit(request_id=rid, user=user, tool=name, status="ok")
+            return [TextContent(type="text", text=report_text)]
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     except Exception as e:

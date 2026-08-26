@@ -181,21 +181,19 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
-### Fase 4.5 — Distribución al equipo ← **SIGUIENTE**
+### Fase 4.5 — Alias local ← **SIGUIENTE**
 
-**Contexto:** El script funciona localmente. Para que otro miembro del equipo lo use, necesita:
-1. El stack corriendo en su máquina (o acceso remoto a `:18000`)
-2. El script disponible como comando, no como `python scripts/developer-assistant.py`
+**Contexto:** Stack de uso único para el desarrollador. No hay distribución al equipo por ahora.  
+El único paso pendiente es evitar escribir `python scripts/developer-assistant.py` en cada uso.
 
-**Entregables:**
-- `scripts/install.sh` — copia `developer-assistant.py` a `~/.local/bin/da`, instala dependencias, lanza `init`
-- Alias en `.bashrc`/`.zshrc`: `alias da="python ~/.local/bin/da"`
-- `docs/onboarding-developer-assistant.md` — guía de 5 pasos para incorporar a un nuevo usuario
+**Entregable:**
+- Alias `da` en `~/.zshrc` / `~/.bashrc`:
+  ```bash
+  alias da="python /home/idavid/dev/claude/claude-mcp-jira/scripts/developer-assistant.py"
+  ```
 
 **Criterio de aceptación:**
-- Un compañero sin conocimiento previo del repo puede ejecutar `da deploy` en menos de 10 minutos desde cero
-
-**Nota:** Evaluar si el acceso es local (cada uno levanta su stack) o compartido (servidor interno en la red Zurich apuntando a `:18000`). La segunda opción elimina la necesidad de que cada usuario levante el stack.
+- `da health`, `da saz`, `da deploy` funcionan desde cualquier directorio
 
 ---
 

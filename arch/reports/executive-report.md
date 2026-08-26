@@ -1,7 +1,7 @@
 # Reporte Ejecutivo: claude-mcp-jira
 # Agente de Automatización de Desarrollo — Zurich Insurance Ecuador
 
-**Fecha**: Junio 2026  
+**Fecha**: Agosto 2026  
 **Equipo**: Desarrollo Digital — Zurich Insurance Ecuador  
 **Contacto**: carlos.duarte2@mx.zurich.com
 
@@ -9,84 +9,117 @@
 
 ## ¿Qué es?
 
-`claude-mcp-jira` es un **agente de IA integrado al flujo de desarrollo** del equipo Ecuador que automatiza tareas repetitivas de gestión de proyectos: creación y actualización de tickets Jira, solicitudes de despliegue (SAZ), registro de horas trabajadas y gestión de Pull Requests en Azure DevOps, todo desde el IDE (Claude Code) o la línea de comandos, usando lenguaje natural.
+`claude-mcp-jira` es una **plataforma de automatización del ciclo de desarrollo** construida sobre la red corporativa Zurich. Integra Jira, Git y Azure DevOps en un flujo único controlado por lenguaje natural, eliminando tareas manuales repetitivas del equipo de desarrollo.
+
+Opera como un **servicio siempre disponible** (systemd, reinicio automático con WSL) accesible desde tres superficies:
+
+- **Claude Code** — herramientas MCP en el IDE, invocadas en lenguaje natural
+- **CLI `da`** — script interactivo para flujos frecuentes sin abrir el IDE
+- **REST API** — integración directa desde scripts o pipelines CI
 
 ---
 
 ## Problema que resuelve
 
-El equipo de desarrollo dedicaba tiempo manual a:
-
 | Tarea | Antes | Ahora |
 |---|---|---|
-| Crear y actualizar tickets Jira | Formulario web manual | Texto libre desde el IDE: _"crea un bug en ZNRX, prioridad alta, login en producción"_ |
-| Solicitar despliegue al equipo DevOps | Ticket SAZ manual en Jira | Un comando: repo + rama + ambiente → PR Azure + SAZ creados automáticamente |
-| Registrar horas trabajadas | Entrada manual en Jira (frecuentemente no hecha) | Automático desde el historial de commits de Git |
+| Crear y actualizar tickets Jira | Formulario web manual | Texto libre desde IDE o CLI: _"crea bug en ZNRX, prioridad alta, login en producción"_ |
+| Solicitar despliegue (SAZ) | Ticket SAZ manual en Jira | Un comando: repo + rama + ambiente → PR Azure + SAZ creados automáticamente |
+| Registrar horas trabajadas | Entrada manual (frecuentemente no hecha) | Automático desde historial de commits: detecta sesiones, infiere ticket desde la rama, registra en Jira |
 | Coordinar PR en Azure DevOps | Flujo manual en portal Azure | Orquestado desde Claude Code: commit → rama → PR → esperar CI → comentar en Jira |
 
 ---
 
-## Estado actual
+## Estado actual (agosto 2026)
 
-- **19 herramientas MCP** operativas (Jira, Git, Azure DevOps, Workflows)
-- **232 tests** automatizados — end-to-end validado con PRs y SAZs reales
+- **20 herramientas MCP** operativas: Jira · Git Intelligence · Azure DevOps · Workflow Orchestrator
+- **240 tests** automatizados — end-to-end validado con PRs y SAZs reales en producción
 - **100% red interna Zurich** — sin dependencias a servicios cloud externos
-- Funcionando en producción con los proyectos ZNRX, AIPROJECTS, SAZ, SCRX
+- **Servicio systemd** — arranca automáticamente con WSL, se reinicia solo si cae
+- **CLI `developer-assistant`** — 9 comandos; auto-detecta repo y rama desde git; historial local
+
+Proyectos Jira activos: ZNRX · AIPROJECTS · SAZ · SCRX · auto-discovery para cualquier otro proyecto.
+
+---
+
+## Capacidades diferenciales
+
+### Git Intelligence — worklogs automáticos
+
+El sistema analiza el historial de commits de un repositorio y genera worklogs en Jira de forma automática:
+
+1. **Detecta sesiones de trabajo** a partir de los gaps temporales entre commits
+2. **Infiere el ticket Jira** desde el nombre de la rama (`feature/ZNRX-68488_descripcion`) o el mensaje de commit
+3. **Estima el tiempo** por tipo de cambio y complejidad
+4. **Claude humaniza la estimación** — ajusta por contexto: debugging (+50%), trabajo nocturno (+15min), alta complejidad (+30%)
+5. **Registra el worklog** en Jira con un solo comando, en modo previsualización por defecto
+
+```
+da worklog
+→ ZNRX-68488   4.5h   "Implementación deducibles vidrios — frontend"
+→ ZNRX-68580   2.0h   "Pruebas funcionales editPlan"
+TOTAL: 6.5h  — ¿confirmar? [S/n]
+```
+
+### Deployment SAZ workflow — despliegue en un comando
+
+```
+da deploy
+Repo   : ov-arizona-backend-ecuador
+Branch : feature/ZNRX-67108_vidrios
+Target : test
+Ticket : ZNRX-67108
+
+→ PR #2835 creado en Azure DevOps
+→ SAZ-7591 creado y vinculado a ZNRX-67108
+```
 
 ---
 
 ## Evaluación del ecosistema global Zurich (junio 2026)
 
-A sugerencia de Jose Luis Sanchez Ros (AI Business Solutions Lead, Zurich España), se evaluó el MCP global de Zurich (`et-ai-mcp-jira` en `skills.ai.zurich.com`) como posible base o reemplazo.
-
-### Resultado de la evaluación
+A sugerencia de Jose Luis Sanchez Ros (AI Business Solutions Lead, Zurich España), se evaluó `et-ai-mcp-jira` (`skills.ai.zurich.com`) como posible base o reemplazo.
 
 | Capacidad | MCP Global Zurich | claude-mcp-jira |
 |---|---|---|
-| CRUD básico Jira (crear, actualizar, buscar, comentar) | ✅ | ✅ |
-| Registrar horas trabajadas (worklog) | ❌ No disponible | ✅ |
-| Asignar, cambiar prioridad, gestionar labels | ❌ No disponible | ✅ |
-| Solicitud de despliegue (SAZ) | ❌ No disponible | ✅ |
-| Azure DevOps — tenant Ecuador | ❌ No disponible | ✅ |
-| Git Intelligence (worklogs desde commits) | ❌ No disponible | ✅ |
-| RBAC + audit log corporativo | ❌ No disponible | ✅ |
+| CRUD básico Jira | ✅ | ✅ |
+| Registrar horas (worklog) | ❌ | ✅ |
+| Asignar, prioridad, labels, link | ❌ | ✅ |
+| Solicitud de despliegue SAZ | ❌ | ✅ |
+| Azure DevOps — tenant Ecuador | ❌ | ✅ |
+| Git Intelligence | ❌ | ✅ |
+| RBAC + audit log corporativo | ❌ | ✅ |
 
-El MCP global cubre el CRUD básico (~40% de las operaciones cotidianas). Los casos de uso diferenciadores del equipo Ecuador — worklog automático, despliegues SAZ, Azure DevOps del tenant ecuatoriano — no están disponibles ni están en el roadmap del servicio global.
-
-### Decisión
-
-**Mantener `claude-mcp-jira` como sistema principal.** El MCP global es un punto de referencia valioso y una futura oportunidad de integración, pero no reemplaza las capacidades especializadas desarrolladas para Ecuador.
+**Decisión:** mantener `claude-mcp-jira` como sistema principal. El MCP global cubre ~40% de las operaciones cotidianas; los casos de uso diferenciadores del equipo Ecuador no están disponibles ni en el roadmap global.
 
 ---
 
 ## Posicionamiento en el ecosistema Zurich
 
-`claude-mcp-jira` no compite con el MCP global — es complementario:
+`claude-mcp-jira` no compite con el MCP global — es un **AGENTE especializado Ecuador** que opera encima del ecosistema Zurich:
 
 ```
 Zurich Global AI Platform
-    └── et-ai-mcp-jira  (CRUD Jira genérico)
-    └── et-ai-mcp-devops-work-management  (Azure DevOps global)
+    └── et-ai-mcp-jira              (CRUD Jira genérico)
+    └── et-ai-mcp-devops            (Azure DevOps global)
 
-claude-mcp-jira  ←── AGENTE especializado Ecuador
-    ├── Worklogs automáticos desde Git
-    ├── Solicitudes SAZ con plantillas Ecuador
-    ├── Azure DevOps tenant ZEC (ZurichInsurance-EC / Oficina-Virtual-ZEC)
-    └── Workflow orquestado: commit → PR → CI → Jira
+claude-mcp-jira  ←── AGENTE Ecuador
+    ├── Git Intelligence            worklogs automáticos desde commits
+    ├── Deployment SAZ workflow     PR Azure + SAZ en un comando
+    ├── Azure DevOps ZEC            tenant ZurichInsurance-EC
+    ├── Workflow Orchestrator       6 pasos orquestados
+    └── CLI developer-assistant     sin IDE, sin curl
 ```
-
-En términos del modelo AGENTE que maneja Zurich Global AI, `claude-mcp-jira` equivale a un **AGENTE de dominio** — no un MCP plano, sino un orquestador especializado con inteligencia de negocio para el contexto Ecuador.
 
 ---
 
 ## Próximos pasos
 
-| Iniciativa | Estado | Descripción |
-|---|---|---|
-| Evaluar `et-ai-mcp-devops-work-management` | Pendiente | Agente A2A de DevOps global; evaluar cuando haya tokens de equipo y gateway productivo |
-| Releases / versiones Jira | Futura | `et-ai-mcp-jira` tiene herramientas de releases que no tenemos; candidato para integración |
-| UI web | Futura | Panel para usuarios no técnicos (project managers, analistas); tras validar demanda |
-| Integración con MCP global | Condicional | Si `et-ai-mcp-jira` añade worklog y link, y el gateway pasa a productivo sin `-dev` |
+| Iniciativa | Estado |
+|---|---|
+| Evaluar `et-ai-mcp-devops-work-management` (agente A2A global) | Pendiente — cuando haya tokens de equipo |
+| Integración con MCP global | Condicional — si gateway pasa a productivo y añade worklog/link |
+| UI web para usuarios no técnicos | Futura — tras validar demanda |
 
 ---
 
@@ -94,7 +127,8 @@ En términos del modelo AGENTE que maneja Zurich Global AI, `claude-mcp-jira` eq
 
 | Documento | Descripción |
 |---|---|
-| `arch/reports/mcp-technical-report.md` | Arquitectura, herramientas y seguridad en detalle |
-| `arch/evaluations/eval-integracion-mcp-global-vs-local-2026-06-25.md` | Informe técnico de integración vs MCP global |
-| `arch/evaluations/eval-zurich-mcp-integracion-2026-06-25.md` | Análisis estratégico y decisión documentada |
-| Ticket referencia evaluación | ZNRX-68298 — `[MCP Claude Jira Test] Validación et-ai-mcp-jira desde Ecuador` |
+| `arch/reports/mcp-technical-report.md` | Arquitectura, 20 tools y seguridad en detalle (v2.2) |
+| `docs/onboarding-developer-assistant.md` | Guía de instalación desde cero (5 pasos) |
+| `arch/design/systemd-services.md` | Patrón de servicios persistentes |
+| `arch/evaluations/` | Análisis estratégico vs MCP global (junio 2026) |
+| Ticket referencia | ZNRX-68298 — validación `et-ai-mcp-jira` desde Ecuador |

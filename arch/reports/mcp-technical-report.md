@@ -1,7 +1,7 @@
 # Informe Técnico: claude-mcp-jira
 # Agente de Automatización de Desarrollo — Zurich Insurance Ecuador
 
-**Versión**: 2.1  
+**Versión**: 2.2  
 **Fecha**: Agosto 2026  
 **Equipo**: Desarrollo Zurich Insurance Ecuador  
 **Contacto**: carlos.duarte2@mx.zurich.com
@@ -22,7 +22,7 @@ El sistema opera como un **Agente especializado Ecuador** — equivalente al con
 | **Workflow Orchestrator** | 6 pasos orquestados: commit → rama → PR → CI → Jira | ❌ No |
 | **Azure DevOps EC** | Integración con tenant `ZurichInsurance-EC / Oficina-Virtual-ZEC` | ❌ No |
 
-**Estado actual:** 20 MCP tools operativos · 240 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich.
+**Estado actual:** 20 MCP tools operativos · 240 tests · validación end-to-end con PRs y SAZs reales · red 100% interna Zurich · CLI `developer-assistant` para uso directo sin Claude Code.
 
 ---
 
@@ -59,14 +59,14 @@ El sistema respeta todas las restricciones corporativas:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   INTERFAZ DE USUARIO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [Claude Code (IDE)]          [CLI (Typer)]
-         │ SSE/MCP                   │ HTTP
-         ▼                           ▼
+  [Claude Code (IDE)]     [CLI (Typer)]    [developer-assistant `da`]
+         │ SSE/MCP              │ HTTP              │ HTTP
+         ▼                      │                   │
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   MCP SERVER  :18001  (jira_mcp/)
   Auth: X-API-Key + IP allowlist + RBAC + rate limit
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-         │ HTTP
+         │ HTTP (todos los clientes convergen aquí)
          ▼
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   SERVICE LAYER  :18000  (service/)
@@ -78,7 +78,7 @@ El sistema respeta todas las restricciones corporativas:
   [→ Claude API]           [REST API v2]        [Git + Azure DevOps EC]
 ```
 
-**Principio:** el MCP server nunca llama a Jira ni a Claude directamente — todo pasa por el service layer.
+**Principio:** el MCP server nunca llama a Jira ni a Claude directamente — todo pasa por el service layer. El CLI `developer-assistant` accede directamente al service layer (:18000), sin pasar por el MCP server.
 
 ### 2.2 ¿Qué es MCP?
 
@@ -119,10 +119,27 @@ Funcionalidad diferencial — no existe equivalente en el ecosistema global Zuri
 | `sync_git_worklogs` | Escanea commits por autor/período → detecta sesiones de trabajo → registra worklogs en Jira; `dry_run=true` por defecto; Claude humanizer ajusta estimaciones semánticamente |
 | `report_git_worklogs` | Solo lectura: ejecuta `sync_git_worklogs(dry_run=True)` y retorna tabla agrupada por ticket (`Ticket · Horas · Commits · Confianza`); `since_days` default 7 |
 
-**Flujo típico:**
+**Inferencia de ticket por sesión de trabajo:**
+
+Cada sesión detectada es asignada al ticket Jira correspondiente mediante este orden de prioridad:
+
 ```
-git log → detectar sesiones (gap temporal) → estimar tiempo por LOC/tipo → Claude ajusta 
-(debugging = ×1.5, alta complejidad = ×1.3, trabajo nocturno = +15min) → POST /worklog en Jira
+1. Nombre de rama   feature/ZNRX-68488_vidrios  →  ZNRX-68488
+                    fix/SCRX-13654_referrals     →  SCRX-13654
+
+2. Mensaje de commit  "ZNRX-68488: actualizar diccionario"  →  ZNRX-68488
+
+3. default_issue_key  configurado en el registro del repo (fallback)
+```
+
+El patrón regex reconoce cualquier proyecto de formato `[A-Z]+-\d+` (ZNRX, SCRX, SAZ, AIPROJECTS, etc.). Si ninguna fuente entrega un ticket, la sesión queda sin asignar y se muestra como `sin-ticket` en el reporte.
+
+**Flujo completo:**
+```
+git log → detectar sesiones (gap temporal) → inferir ticket (rama→commit→default)
+→ estimar tiempo por LOC/tipo → Claude ajusta 
+(debugging = ×1.5, alta complejidad = ×1.3, trabajo nocturno = +15min)
+→ POST /worklog en Jira
 ```
 
 ### 3.3 Azure DevOps / PR lifecycle (4 tools)
@@ -288,17 +305,45 @@ claude-mcp-jira  [AGENTE Ecuador — orquestación + especialización]
 ## 9. Instalación y configuración
 
 ```bash
-# Requisitos: conda, Docker
+# Requisitos: miniconda3, WSL2 con systemd habilitado
 conda env create -f environment.yml
 conda activate claude-mcp-jira
 cp .env.example .env
-# Completar: JIRA_PAT, MCP_API_KEY, TOKEN_AZURE
-# Descomentar: REQUESTS_CA_BUNDLE=certs/zurichseguros-rootca-until-2031_03_20.crt
+# Completar: JIRA_PAT, MCP_API_KEY, TOKEN_AZURE, ANTHROPIC_AUTH_TOKEN
+```
 
-# Levantar stack completo
+**Servicio persistente (recomendado) — arranca con WSL, restart automático:**
+
+```bash
+# Crear unit systemd
+mkdir -p ~/.config/systemd/user
+sed "s/<tu-usuario>/$USER/g" > ~/.config/systemd/user/claude-mcp-jira.service << 'EOF'
+[Unit]
+Description=claude-mcp-jira — service layer (:18000) + MCP server (:18001)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/<tu-usuario>/dev/claude/claude-mcp-jira
+ExecStart=/bin/bash /home/<tu-usuario>/dev/claude/claude-mcp-jira/scripts/start_service.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user enable --now claude-mcp-jira
+loginctl enable-linger $USER   # corre aunque no haya sesión activa
+```
+
+**Modo Docker (alternativa):**
+```bash
 docker compose up
+```
 
-# Modo desarrollo
+**Modo desarrollo:**
+```bash
 bash scripts/dev.sh both    # service :18000 + MCP :18001
 ```
 
@@ -315,6 +360,75 @@ bash scripts/dev.sh both    # service :18000 + MCP :18001
 }
 ```
 
+Ver guía completa de instalación paso a paso: `docs/onboarding-developer-assistant.md`.
+
+---
+
+## 11. developer-assistant — CLI cliente
+
+`developer-assistant` (`da`) es la herramienta de línea de comandos que expone todas las capacidades del service layer (:18000) sin necesidad de Claude Code ni de escribir `curl` manualmente.
+
+### Comandos
+
+```bash
+da health           # estado de los 4 servicios del ecosistema
+da init             # configuración inicial interactiva
+
+da ticket           # crear o buscar ticket Jira (lenguaje natural)
+da saz              # crear SAZ de despliegue desde un PR existente
+da deploy           # workflow completo: PR Azure DevOps + SAZ en un paso
+da worklog          # registrar horas desde git (dry_run por defecto)
+
+da repos            # listar repos configurados; marca el repo activo
+da history          # últimas 20 operaciones (SAZs y PRs)
+da status <id>      # estado de un workflow en ejecución
+```
+
+### Configuración
+
+`~/.developer-assistant/config.json` — generado por `da init`:
+
+```json
+{
+  "api_url": "http://localhost:18000",
+  "api_key": "<MCP_API_KEY>",
+  "default_project": "ZNRX",
+  "default_assignee": "SEBASTIAN.MAYORGA",
+  "repos": {
+    "ov-arizona-backend-ecuador": {
+      "default_target": "test",
+      "default_branch_prefix": "feature/",
+      "jira_project": "ZNRX"
+    }
+  }
+}
+```
+
+### Auto-detección de contexto git
+
+Al ejecutar `da saz` o `da deploy` desde dentro de un repositorio git, el CLI detecta automáticamente el repo y la rama actual:
+
+```
+git remote get-url origin  →  nombre del repo
+git branch --show-current  →  rama activa
+```
+
+Si el repo está en la sección `repos` de la config, los campos `repo`, `target` y `branch` se prerellenan sin preguntar.
+
+### Historial
+
+Cada operación exitosa se guarda en `~/.developer-assistant/history.json` (últimas 100 entradas):
+
+```
+da history
+→  2026-08-25 19:30  DEPLOY  PR #2835  SAZ SAZ-7591  ZNRX-68881
+→  2026-08-25 18:15  SAZ     SAZ-7590  ov-arizona-backend-ecuador  feature/ZNRX-67108 → test
+```
+
+### Dependencias
+
+`stdlib` Python únicamente — `urllib`, `argparse`, `json`, `pathlib`, `subprocess`. Sin `pip install`.
+
 ---
 
 ## 10. Referencias
@@ -329,5 +443,8 @@ bash scripts/dev.sh both    # service :18000 + MCP :18001
 | Informe técnico integración vs MCP global | `arch/evaluations/eval-integracion-mcp-global-vs-local-2026-06-25.md` |
 | Base de datos SQLite | `arch/bd/README.md` |
 | Proyectos Jira (restricciones, TICKET_LANG) | `docs/jira-projects.md` |
+| Patrón systemd (3 servicios del ecosistema) | `arch/design/systemd-services.md` |
+| Plan developer-assistant | `arch/design/developer-assistant-plan.md` |
+| Guía de instalación desde cero | `docs/onboarding-developer-assistant.md` |
 | MCP Specification | https://spec.modelcontextprotocol.io |
 | MCP Python SDK | https://github.com/modelcontextprotocol/python-sdk |

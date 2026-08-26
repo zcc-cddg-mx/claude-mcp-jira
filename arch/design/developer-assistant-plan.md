@@ -181,13 +181,11 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
-### Fase 4.5 — Alias local ✅ Completa
+### Fase 4.5 — Instalación local ✅ Completa
 
-**Entregable:**
-- Alias `da` añadido en `~/.zshrc` (línea 181):
-  ```bash
-  alias da="python /home/idavid/dev/claude/claude-mcp-jira/scripts/developer-assistant.py"
-  ```
+**Entregables:**
+- Alias `da` añadido en `~/.zshrc` (línea 181)
+- `docs/onboarding-developer-assistant.md` — guía de 5 pasos para instalación desde cero
 
 **Criterio de aceptación:**
 - `da health`, `da saz`, `da deploy` funcionan desde cualquier directorio ✅ (activo en nueva sesión zsh)

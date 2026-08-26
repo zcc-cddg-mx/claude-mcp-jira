@@ -1,6 +1,6 @@
 # Plan de Implementación — developer-assistant
 **Fecha:** 2026-08-25  
-**Estado:** v2.0 operativo — plataforma completa para uso propio; pendiente distribución al equipo  
+**Estado:** v2.0 completo — todas las fases near-term implementadas  
 **Contexto:** `claude-mcp-jira` como Developer Automation API Gateway
 
 ---
@@ -181,19 +181,16 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
-### Fase 4.5 — Alias local ← **SIGUIENTE**
-
-**Contexto:** Stack de uso único para el desarrollador. No hay distribución al equipo por ahora.  
-El único paso pendiente es evitar escribir `python scripts/developer-assistant.py` en cada uso.
+### Fase 4.5 — Alias local ✅ Completa
 
 **Entregable:**
-- Alias `da` en `~/.zshrc` / `~/.bashrc`:
+- Alias `da` añadido en `~/.zshrc` (línea 181):
   ```bash
   alias da="python /home/idavid/dev/claude/claude-mcp-jira/scripts/developer-assistant.py"
   ```
 
 **Criterio de aceptación:**
-- `da health`, `da saz`, `da deploy` funcionan desde cualquier directorio
+- `da health`, `da saz`, `da deploy` funcionan desde cualquier directorio ✅ (activo en nueva sesión zsh)
 
 ---
 

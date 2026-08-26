@@ -1,6 +1,6 @@
 # Plan de Implementación — developer-assistant
 **Fecha:** 2026-08-25  
-**Estado:** v2.0 completo — todas las fases near-term implementadas  
+**Estado:** ✅ Completo — plan cerrado. Próxima apertura: Fase 5 cuando haya demanda no-técnica validada.  
 **Contexto:** `claude-mcp-jira` como Developer Automation API Gateway
 
 ---
@@ -192,9 +192,22 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
-### Fase 5 — UI Web (futuro)
+### Fase 5 — UI Web (futuro / sin fecha)
 
-Cuando haya demanda no-técnica validada. Misma API `:18000`.
+Cuando haya demanda no-técnica validada. Misma API `:18000`. No requiere cambios en el backend.
+
+---
+
+## Resumen final
+
+| Artefacto | Descripción |
+|-----------|-------------|
+| `scripts/developer-assistant.py` | CLI v2.0 — 9 comandos; stdlib; auto-detect git |
+| `scripts/start_service.sh` | Wrapper systemd para stack :18000/:18001 |
+| `~/.config/systemd/user/claude-mcp-jira.service` | Servicio systemd habilitado y activo |
+| `alias da` en `~/.zshrc` | Acceso global al CLI |
+| `docs/onboarding-developer-assistant.md` | Guía de instalación desde cero (5 pasos) |
+| `arch/design/systemd-services.md` | Patrón systemd documentado para los 3 servicios |
 
 ---
 

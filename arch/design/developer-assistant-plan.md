@@ -1,6 +1,6 @@
 # Plan de Implementación — developer-assistant
 **Fecha:** 2026-08-25  
-**Estado:** En progreso — Fases 1, 2 y 4 completas  
+**Estado:** v2.0 operativo — plataforma completa para uso propio; pendiente distribución al equipo  
 **Contexto:** `claude-mcp-jira` como Developer Automation API Gateway
 
 ---
@@ -181,6 +181,24 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
+### Fase 4.5 — Distribución al equipo ← **SIGUIENTE**
+
+**Contexto:** El script funciona localmente. Para que otro miembro del equipo lo use, necesita:
+1. El stack corriendo en su máquina (o acceso remoto a `:18000`)
+2. El script disponible como comando, no como `python scripts/developer-assistant.py`
+
+**Entregables:**
+- `scripts/install.sh` — copia `developer-assistant.py` a `~/.local/bin/da`, instala dependencias, lanza `init`
+- Alias en `.bashrc`/`.zshrc`: `alias da="python ~/.local/bin/da"`
+- `docs/onboarding-developer-assistant.md` — guía de 5 pasos para incorporar a un nuevo usuario
+
+**Criterio de aceptación:**
+- Un compañero sin conocimiento previo del repo puede ejecutar `da deploy` en menos de 10 minutos desde cero
+
+**Nota:** Evaluar si el acceso es local (cada uno levanta su stack) o compartido (servidor interno en la red Zurich apuntando a `:18000`). La segunda opción elimina la necesidad de que cada usuario levante el stack.
+
+---
+
 ### Fase 5 — UI Web (futuro)
 
 Cuando haya demanda no-técnica validada. Misma API `:18000`.
@@ -198,16 +216,20 @@ Cuando haya demanda no-técnica validada. Misma API `:18000`.
 
 ---
 
-## Archivos a crear
+## Archivos creados
 
 ```
 claude-mcp-jira/
 └── scripts/
-    └── developer-assistant.py    # CLI principal
+    ├── developer-assistant.py    # CLI v2.0 — 9 comandos
+    └── start_service.sh          # Wrapper systemd
+
+~/.config/systemd/user/
+└── claude-mcp-jira.service       # Unit systemd (no versionado)
 
 ~/.developer-assistant/
-├── config.json                   # Config por usuario
-└── history.json                  # Historial local (Fase 4)
+├── config.json                   # Config por usuario (init)
+└── history.json                  # Historial operaciones (auto)
 ```
 
 ---

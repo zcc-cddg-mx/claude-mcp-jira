@@ -1,6 +1,6 @@
 # Plan de Implementación — developer-assistant
 **Fecha:** 2026-08-25  
-**Estado:** En progreso — Fases 1 y 2 completas  
+**Estado:** En progreso — Fases 1, 2 y 4 completas  
 **Contexto:** `claude-mcp-jira` como Developer Automation API Gateway
 
 ---
@@ -163,23 +163,21 @@ Implementar solo si surge un flujo que requiera centralizar el routing en `:1800
 
 ---
 
-### Fase 4 — Configuración por proyecto (v2.0) ← **SIGUIENTE**
+### Fase 4 — Configuración por proyecto (v2.0) ✅ Completa
 
 **Entregables:**
-- Soporte multi-repo en config:
-  ```json
-  "repos": {
-    "ov-arizona-backend-ecuador": { "default_target": "test", "default_branch_prefix": "feature/" },
-    "ov-core-backend": { "default_target": "developer" }
-  }
-  ```
-- `developer-assistant` detecta el repo actual con `git remote get-url origin` y aplica defaults automáticamente — sin prompts repetitivos
-- Historial local de SAZs y PRs creados (`~/.developer-assistant/history.json`)
-- Nuevo comando `developer-assistant repos` — lista repos configurados y su estado
+- Sección `repos` en `config.json`: `{repo_name: {default_target, default_branch_prefix, jira_project}}`
+- `detect_repo()` — extrae nombre de repo y rama actual con `git remote get-url origin` + `git branch --show-current`
+- `saz` y `deploy` prerellenan repo, rama y ambiente desde el contexto git; sin prompts repetitivos
+- `ticket crear` usa el `jira_project` del repo detectado como default
+- Historial en `~/.developer-assistant/history.json` (últimas 100 ops, inserta al frente)
+- Nuevo comando `repos` — lista repos con default_target/prefix/proyecto; marca el repo activo en verde
+- Nuevo comando `history` — muestra las últimas 20 operaciones con timestamp UTC
+- Fix: health check acepta HTTPError como "puerto activo" (MCP server no tiene `/health`)
 
 **Criterio de aceptación:**
-- Desde dentro de un repo git reconocido, `developer-assistant saz` prelellena repo, rama y ambiente sin preguntar
-- `developer-assistant history` muestra los últimos 10 SAZs/PRs creados
+- `developer-assistant saz` desde un repo conocido no pregunta repo ni ambiente ✅
+- `developer-assistant history` muestra SAZs y PRs creados ✅
 
 ---
 

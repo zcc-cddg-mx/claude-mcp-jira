@@ -2,23 +2,28 @@
 """developer-assistant — CLI para claude-mcp-jira API Gateway (:18000)
 
 Uso:
-    developer-assistant.py --init          Configuración inicial
-    developer-assistant.py health          Estado de los 4 servicios
-    developer-assistant.py saz             Crear SAZ de despliegue (interactivo)
-    developer-assistant.py deploy          Workflow completo: PR + SAZ
-    developer-assistant.py worklog         Registrar horas desde git
-    developer-assistant.py ticket          Crear o buscar ticket Jira
-    developer-assistant.py status [id]     Estado de un workflow
+    developer-assistant.py init             Configuración inicial
+    developer-assistant.py health           Estado de los 4 servicios
+    developer-assistant.py saz              Crear SAZ de despliegue (interactivo)
+    developer-assistant.py deploy           Workflow completo: PR + SAZ
+    developer-assistant.py worklog          Registrar horas desde git
+    developer-assistant.py ticket           Crear o buscar ticket Jira
+    developer-assistant.py status [id]      Estado de un workflow
+    developer-assistant.py repos            Listar repos configurados
+    developer-assistant.py history          Últimas operaciones registradas
 """
 
 import argparse
 import json
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 
-CONFIG_PATH = Path.home() / ".developer-assistant" / "config.json"
+CONFIG_PATH  = Path.home() / ".developer-assistant" / "config.json"
+HISTORY_PATH = Path.home() / ".developer-assistant" / "history.json"
 
 DEFAULT_CONFIG = {
     "api_url": "http://localhost:18000",
@@ -27,6 +32,7 @@ DEFAULT_CONFIG = {
     "default_repo": "ov-arizona-backend-ecuador",
     "default_team": "Soporte Oficina Virtual",
     "default_assignee": "SEBASTIAN.MAYORGA",
+    "repos": {},
 }
 
 SERVICES = {
@@ -55,7 +61,9 @@ def bold(msg): print(f"{BOLD}{msg}{RESET}")
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
-        return json.loads(CONFIG_PATH.read_text())
+        cfg = json.loads(CONFIG_PATH.read_text())
+        cfg.setdefault("repos", {})
+        return cfg
     return DEFAULT_CONFIG.copy()
 
 
@@ -63,19 +71,43 @@ def save_config(cfg: dict) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2))
 
+# ── historial ──────────────────────────────────────────────────────────────────
 
-def cmd_init(_args, _cfg):
-    bold("Configuración inicial — developer-assistant")
-    print(f"Se guardará en: {CONFIG_PATH}\n")
-    cfg = load_config()
-    cfg["api_url"]          = prompt("API URL",           cfg.get("api_url", DEFAULT_CONFIG["api_url"]))
-    cfg["api_key"]          = prompt("API Key (MCP_API_KEY)", cfg.get("api_key", ""))
-    cfg["default_project"]  = prompt("Proyecto por defecto",  cfg.get("default_project", DEFAULT_CONFIG["default_project"]))
-    cfg["default_repo"]     = prompt("Repo por defecto",      cfg.get("default_repo",    DEFAULT_CONFIG["default_repo"]))
-    cfg["default_team"]     = prompt("Equipo por defecto",    cfg.get("default_team",    DEFAULT_CONFIG["default_team"]))
-    cfg["default_assignee"] = prompt("Assignee SAZ (username Jira)", cfg.get("default_assignee", DEFAULT_CONFIG["default_assignee"]))
-    save_config(cfg)
-    ok(f"Config guardada en {CONFIG_PATH}")
+def save_history(entry: dict) -> None:
+    history: list = []
+    if HISTORY_PATH.exists():
+        try:
+            history = json.loads(HISTORY_PATH.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    history.insert(0, {"created_at": ts, **entry})
+    HISTORY_PATH.write_text(json.dumps(history[:100], indent=2))
+
+# ── detección de repo git ──────────────────────────────────────────────────────
+
+def detect_repo() -> tuple[str, str]:
+    """Devuelve (repo_name, current_branch) desde el contexto git actual."""
+    try:
+        origin = subprocess.check_output(
+            ["git", "remote", "get-url", "origin"],
+            stderr=subprocess.DEVNULL, text=True,
+        ).strip()
+        repo_name = origin.rstrip("/").split("/")[-1]
+        if repo_name.endswith(".git"):
+            repo_name = repo_name[:-4]
+        branch = subprocess.check_output(
+            ["git", "branch", "--show-current"],
+            stderr=subprocess.DEVNULL, text=True,
+        ).strip()
+        return repo_name, branch
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return "", ""
+
+
+def repo_defaults(cfg: dict, repo_name: str) -> dict:
+    """Devuelve los defaults del repo si está configurado, o vacío."""
+    return cfg.get("repos", {}).get(repo_name, {})
 
 # ── API client ─────────────────────────────────────────────────────────────────
 
@@ -95,7 +127,7 @@ def api(cfg: dict, method: str, path: str, body: dict | None = None) -> dict:
     except URLError as e:
         raise RuntimeError(f"No se puede conectar a {url} — {e.reason}") from e
 
-# ── helpers ────────────────────────────────────────────────────────────────────
+# ── helpers interactivos ───────────────────────────────────────────────────────
 
 def prompt(label: str, default: str | int | None = None) -> str:
     if default is not None and str(default):
@@ -113,6 +145,40 @@ def prompt_opt(label: str, default: str = "") -> str:
 
 # ── comandos ───────────────────────────────────────────────────────────────────
 
+def cmd_init(_args, _cfg):
+    bold("Configuración inicial — developer-assistant")
+    print(f"Se guardará en: {CONFIG_PATH}\n")
+    cfg = load_config()
+
+    cfg["api_url"]          = prompt("API URL",                     cfg.get("api_url",          DEFAULT_CONFIG["api_url"]))
+    cfg["api_key"]          = prompt("API Key (MCP_API_KEY)",        cfg.get("api_key",          ""))
+    cfg["default_project"]  = prompt("Proyecto por defecto",         cfg.get("default_project",  DEFAULT_CONFIG["default_project"]))
+    cfg["default_repo"]     = prompt("Repo por defecto",             cfg.get("default_repo",     DEFAULT_CONFIG["default_repo"]))
+    cfg["default_team"]     = prompt("Equipo por defecto",           cfg.get("default_team",     DEFAULT_CONFIG["default_team"]))
+    cfg["default_assignee"] = prompt("Assignee SAZ (username Jira)", cfg.get("default_assignee", DEFAULT_CONFIG["default_assignee"]))
+
+    print()
+    bold("Configuración de repos (uno por uno; Enter en blanco para terminar)")
+    while True:
+        print()
+        repo_name = prompt_opt("Nombre del repo (ej: ov-arizona-backend-ecuador)")
+        if not repo_name:
+            break
+        existing = cfg["repos"].get(repo_name, {})
+        target   = prompt("Ambiente destino por defecto", existing.get("default_target", "test"))
+        prefix   = prompt("Prefijo de ramas (ej: feature/)", existing.get("default_branch_prefix", "feature/"))
+        project  = prompt("Proyecto Jira", existing.get("jira_project", cfg["default_project"]))
+        cfg["repos"][repo_name] = {
+            "default_target": target,
+            "default_branch_prefix": prefix,
+            "jira_project": project,
+        }
+        ok(f"Repo '{repo_name}' configurado.")
+
+    save_config(cfg)
+    ok(f"Config guardada en {CONFIG_PATH}")
+
+
 def cmd_health(_args, _cfg):
     bold("Estado de servicios")
     all_ok = True
@@ -121,22 +187,50 @@ def cmd_health(_args, _cfg):
             req = urllib_request.Request(base + path, method="GET")
             with urllib_request.urlopen(req, timeout=3):
                 ok(f"{name}  {base}")
+        except HTTPError:
+            # Servidor responde con error HTTP (ej: 404 en MCP) — puerto activo
+            ok(f"{name}  {base}")
         except Exception:
             err(f"{name}  {base}  — inactivo")
             all_ok = False
     if not all_ok:
         print()
-        warn("Arrancar con: bash run_local.sh")
+        warn("Arrancar con: systemctl --user start claude-mcp-jira")
+
+
+def cmd_repos(_args, cfg):
+    bold("Repos configurados")
+    repos = cfg.get("repos", {})
+    if not repos:
+        warn("Sin repos configurados. Ejecuta 'init' para agregar uno.")
+        return
+
+    detected_repo, _ = detect_repo()
+    print()
+    for name, r in repos.items():
+        active  = name == detected_repo
+        marker  = f"{GREEN}◀ repo actual{RESET}" if active else ""
+        target  = r.get("default_target", "—")
+        prefix  = r.get("default_branch_prefix", "—")
+        project = r.get("jira_project", cfg.get("default_project", "—"))
+        label   = f"{BOLD}{name}{RESET}" if active else name
+        print(f"  {label}  {marker}")
+        print(f"      target: {target}   prefix: {prefix}   proyecto: {project}")
+        print()
 
 
 def cmd_saz(_args, cfg):
     """Crea un SAZ de despliegue a partir de un PR ya existente."""
     bold("Crear SAZ de despliegue")
     print()
-    repo         = prompt("Repositorio",   cfg.get("default_repo"))
+
+    detected_repo, detected_branch = detect_repo()
+    rd = repo_defaults(cfg, detected_repo)
+
+    repo         = prompt("Repositorio",   detected_repo or cfg.get("default_repo"))
     task         = prompt("Descripción de la tarea")
-    target       = prompt("Ambiente destino", "test")
-    branch       = prompt("Rama origen (feature/...)")
+    target       = prompt("Ambiente destino", rd.get("default_target", "test"))
+    branch       = prompt("Rama origen (feature/...)", detected_branch or "")
     base_branch  = prompt("Rama base (destino del PR)", target)
     pr_id        = prompt("PR ID (Azure DevOps)")
     pr_url       = prompt("URL del PR")
@@ -160,9 +254,18 @@ def cmd_saz(_args, cfg):
     info("Creando SAZ...")
     try:
         result = api(cfg, "POST", "/issues/saz/deployment", body)
-        ok(f"SAZ creado: {result.get('saz_key', result)}")
+        saz_key = result.get("saz_key", result)
+        ok(f"SAZ creado: {saz_key}")
         if znrx_key:
             ok(f"Vinculado a: {znrx_key}")
+        save_history({
+            "type": "saz",
+            "saz_key": str(saz_key),
+            "repo": repo,
+            "branch": branch,
+            "target": target,
+            "znrx_key": znrx_key or None,
+        })
     except RuntimeError as e:
         err(str(e))
         sys.exit(1)
@@ -172,12 +275,16 @@ def cmd_deploy(_args, cfg):
     """Workflow completo: crea PR en Azure DevOps + SAZ de despliegue."""
     bold("Workflow completo — PR + SAZ")
     print()
-    repo          = prompt("Repositorio",          cfg.get("default_repo"))
-    branch        = prompt("Rama feature")
-    target        = prompt("Ambiente destino",      "test")
+
+    detected_repo, detected_branch = detect_repo()
+    rd = repo_defaults(cfg, detected_repo)
+
+    repo          = prompt("Repositorio",       detected_repo or cfg.get("default_repo"))
+    branch        = prompt("Rama feature",      detected_branch or "")
+    target        = prompt("Ambiente destino",   rd.get("default_target", "test"))
     ticket        = prompt("Ticket (ZNRX-XXXX o ID requerimiento)")
     task          = prompt("Descripción de la tarea")
-    project_label = prompt("Label de proyecto",    "OV")
+    project_label = prompt("Label de proyecto", "OV")
     znrx_key      = prompt_opt("ZNRX para vincular SAZ (si diferente al ticket)")
 
     body = {
@@ -203,6 +310,16 @@ def cmd_deploy(_args, cfg):
         ok(f"SAZ creado: {saz}")
         if znrx_key or ticket.startswith("ZNRX"):
             ok(f"Vinculado a: {znrx_key or ticket}")
+        save_history({
+            "type": "deploy",
+            "pr_id": pr_id,
+            "pr_url": pr_url,
+            "saz_key": str(saz) if saz else None,
+            "repo": repo,
+            "branch": branch,
+            "target": target,
+            "ticket": ticket,
+        })
     except RuntimeError as e:
         err(str(e))
         sys.exit(1)
@@ -283,7 +400,11 @@ def cmd_ticket(args, cfg):
             sys.exit(1)
 
     else:
-        project = prompt("Proyecto",    cfg.get("default_project"))
+        detected_repo, _ = detect_repo()
+        rd = repo_defaults(cfg, detected_repo)
+        default_project = rd.get("jira_project") or cfg.get("default_project")
+
+        project = prompt("Proyecto",    default_project)
         text    = prompt("Descripción del ticket (lenguaje natural)")
         body = {"project": project, "text": text}
         info("Creando ticket...")
@@ -323,6 +444,48 @@ def cmd_status(args, cfg):
         sys.exit(1)
 
 
+def cmd_history(_args, _cfg):
+    """Muestra las últimas operaciones registradas."""
+    bold("Historial de operaciones")
+    if not HISTORY_PATH.exists():
+        warn("Sin historial aún. Ejecuta 'saz' o 'deploy' para registrar.")
+        return
+    try:
+        history = json.loads(HISTORY_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        err(f"No se pudo leer el historial: {e}")
+        return
+
+    if not history:
+        warn("Historial vacío.")
+        return
+
+    print()
+    for entry in history[:20]:
+        ts     = entry.get("created_at", "")[:16].replace("T", " ")
+        kind   = entry.get("type", "?")
+        repo   = entry.get("repo", "—")
+        branch = entry.get("branch", "")
+        target = entry.get("target", "")
+
+        if kind == "saz":
+            saz = entry.get("saz_key", "—")
+            znrx = entry.get("znrx_key") or ""
+            link = f"  → {znrx}" if znrx else ""
+            print(f"  {CYAN}{ts}{RESET}  {BOLD}SAZ{RESET}     {GREEN}{saz}{RESET}{link}")
+        elif kind == "deploy":
+            pr  = entry.get("pr_id", "—")
+            saz = entry.get("saz_key", "—")
+            tkt = entry.get("ticket", "")
+            print(f"  {CYAN}{ts}{RESET}  {BOLD}DEPLOY{RESET}  PR #{pr}  SAZ {GREEN}{saz}{RESET}  {tkt}")
+        else:
+            print(f"  {CYAN}{ts}{RESET}  {kind}")
+
+        if branch and target:
+            print(f"             {repo}  {branch} → {target}")
+        print()
+
+
 # ── main ───────────────────────────────────────────────────────────────────────
 
 COMMANDS = {
@@ -333,6 +496,8 @@ COMMANDS = {
     "worklog": cmd_worklog,
     "ticket":  cmd_ticket,
     "status":  cmd_status,
+    "repos":   cmd_repos,
+    "history": cmd_history,
 }
 
 
@@ -354,8 +519,8 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config()
-    if not cfg.get("api_key") and args.command not in ("init", "health"):
-        warn(f"Sin API key — ejecuta: python developer-assistant.py --init")
+    if not cfg.get("api_key") and args.command not in ("init", "health", "repos", "history"):
+        warn(f"Sin API key — ejecuta: python developer-assistant.py init")
         warn(f"O configura en {CONFIG_PATH}")
         print()
 

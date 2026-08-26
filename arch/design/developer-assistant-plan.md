@@ -136,13 +136,14 @@ Listo.
 
 ---
 
-### Fase 2 — systemd para claude-mcp-jira
+### Fase 2 — systemd para claude-mcp-jira ✅ Completa
 
 **Entregables:**
-- `~/.config/systemd/user/claude-mcp-jira.service`
-- `start_service.sh` — carga `.env`, fija paths WSL, arranca `scripts/dev.sh both`
-- Linger habilitado
+- `~/.config/systemd/user/claude-mcp-jira.service` — unit instalado y habilitado
+- `scripts/start_service.sh` — carga `.env`, fija overrides WSL, arranca service (:18000) + MCP (:18001); usa `wait -n` para reinicio automático si un proceso muere
+- Linger habilitado (compartido con `simple-jira-agent` y `simple-pr-agent`)
 - `developer-assistant health` verifica los 4 servicios (`:18000`, `:18001`, `:8101`, `:8102`)
+- Documentación del patrón: `arch/design/systemd-services.md`
 
 **Criterio de aceptación:**
 - Servicios activos tras reinicio de WSL sin intervención manual

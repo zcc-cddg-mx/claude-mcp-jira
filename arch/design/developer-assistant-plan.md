@@ -1,6 +1,6 @@
 # Plan de Implementación — developer-assistant
 **Fecha:** 2026-08-25  
-**Estado:** Propuesta  
+**Estado:** En progreso — Fases 1 y 2 completas  
 **Contexto:** `claude-mcp-jira` como Developer Automation API Gateway
 
 ---
@@ -121,18 +121,16 @@ Listo.
 
 ## Fases de implementación
 
-### Fase 1 — CLI funcional (v1.0)
+### Fase 1 — CLI funcional (v1.0) ✅ Completa
 
 **Entregables:**
-- `developer-assistant.py` (o `.sh`) con comandos `saz`, `deploy`, `worklog`, `health`
-- `~/.developer-assistant/config.json` con `--init`
-- Consumo de endpoints existentes en `:18000`
+- `scripts/developer-assistant.py` — comandos `init`, `health`, `saz`, `deploy`, `worklog`, `ticket`, `status`
+- `~/.developer-assistant/config.json` con `init` interactivo
+- Consumo de endpoints existentes en `:18000`; stdlib solo (urllib, argparse, json, pathlib)
 
 **Criterio de aceptación:**
-- Ejecutar `developer-assistant deploy` sin abrir Claude Code
-- Sin parámetros hardcodeados — todo desde config o prompt interactivo
-
-**Implementación sugerida:** Python (argparse + requests) — más fácil de mantener que bash puro para flujos interactivos.
+- Ejecutar `developer-assistant deploy` sin abrir Claude Code ✅
+- Sin parámetros hardcodeados — todo desde config o prompt interactivo ✅
 
 ---
 
@@ -150,7 +148,7 @@ Listo.
 
 ---
 
-### Fase 3 — Delegación interna (opcional)
+### Fase 3 — Delegación interna (opcional / baja prioridad)
 
 **Entregables:**
 - `claude-mcp-jira` delega `POST /issues/saz` → `simple-jira-agent:8101`
@@ -160,16 +158,28 @@ Listo.
 **Criterio de aceptación:**
 - Mismo contrato de API, mismos tests — solo cambia el destino interno de las llamadas
 
-**Nota:** Esta fase es opcional si los agentes especializados ya tienen carga operativa directa (ej. pipelines CI que llaman a `:8101` o `:8102` directamente). Solo implementar si hay beneficio concreto en centralizar el routing.
+**Nota:** Postergar — los agentes especializados ya reciben carga operativa directa desde pipelines CI.  
+Implementar solo si surge un flujo que requiera centralizar el routing en `:18000`.
 
 ---
 
-### Fase 4 — Configuración por proyecto (v2.0)
+### Fase 4 — Configuración por proyecto (v2.0) ← **SIGUIENTE**
 
 **Entregables:**
-- Soporte multi-repo en config: `repos: { ov-arizona-backend-ecuador: { default_target: "test", ... } }`
-- `developer-assistant` detecta el repo actual desde `git remote` y aplica defaults automáticamente
+- Soporte multi-repo en config:
+  ```json
+  "repos": {
+    "ov-arizona-backend-ecuador": { "default_target": "test", "default_branch_prefix": "feature/" },
+    "ov-core-backend": { "default_target": "developer" }
+  }
+  ```
+- `developer-assistant` detecta el repo actual con `git remote get-url origin` y aplica defaults automáticamente — sin prompts repetitivos
 - Historial local de SAZs y PRs creados (`~/.developer-assistant/history.json`)
+- Nuevo comando `developer-assistant repos` — lista repos configurados y su estado
+
+**Criterio de aceptación:**
+- Desde dentro de un repo git reconocido, `developer-assistant saz` prelellena repo, rama y ambiente sin preguntar
+- `developer-assistant history` muestra los últimos 10 SAZs/PRs creados
 
 ---
 

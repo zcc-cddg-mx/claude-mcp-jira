@@ -55,6 +55,52 @@ PUT /rest/api/2/issue/AIPROJECTS-41
 
 ---
 
+## Workflows por tipo de sub-task — SCRX vs ZNRX
+
+Los tipos de sub-task no solo difieren en nombre — **difieren radicalmente en el workflow asignado**.
+
+### SCRX — Sub-task (id `10003`)
+
+Hereda el mismo workflow de **19 estados** que usa Story/Epic/Task en SCRX:
+
+```
+Backlog → Backlog Refinement → To Do → Technical Analysis and Estimation
+→ Architecture Approval → CR → In Progress → Blocked / Blocked by Bug
+→ Approval Required → CAB REVIEW → Deployed & Ready to Test
+→ Ready for QA → Ready for UAT → PROD Deployment → Hypercare/In Production
+→ En BAU → Done / Canceled
+```
+
+**Implicación:** crear una sub-task en SCRX implica aceptar todo el flujo de historia enterprise. No hay tipo de sub-task con workflow simple disponible en SCRX. Si solo se quieren dos estados operativos ("en progreso" / "terminado"), este tipo no es adecuado.
+
+### ZNRX — Subtarea Historia (id `18124`)
+
+Workflow **minimalista de 3 estados**, diseñado para tracking operativo simple:
+
+```
+Open  →  In Progress  →  Done
+```
+
+Es el tipo de sub-task de referencia para trabajo de desarrollo en ZNRX. No existe un equivalente en SCRX.
+
+### Comparativa rápida
+
+| | SCRX Sub-task | ZNRX Subtarea Historia |
+|---|---|---|
+| Tipo id | `10003` | `18124` |
+| Estados | 19 | 3 |
+| Workflow | Enterprise (CAB, PROD, UAT…) | Operativo simple |
+| Cross-proyecto | No (subtask must = mismo proyecto) | No |
+| Verificado | 2026-09-16 | 2026-06-25 |
+
+### Alternativas cuando se necesita tracking simple en SCRX
+
+1. **Solicitar a Jira Admin** — crear un nuevo tipo de sub-task en SCRX con workflow propio de 3 estados. Requiere rol Jira Admin; no es configurable vía API ni desde el proyecto.
+2. **Issue link cross-proyecto** — crear las sub-tareas como `Subtarea Historia` en ZNRX y vincularlas al story SCRX con link tipo `Child of / Parent of` (id `11101`). Traza la relación; los estados son los deseados; no aparece en la tabla de sub-tasks de SCRX pero sí en la sección de links.
+3. **Aceptar el tipo existente** — usar `Sub-task` en SCRX ignorando los estados intermedios enterprise (solo usar `In Progress` y `Done`).
+
+---
+
 ## Tipos de sub-task disponibles por proyecto
 
 | Proyecto | id | Nombre | Notas |
@@ -92,7 +138,7 @@ Campos requeridos para crear una sub-task vía REST:
 |---|---|---|---|
 | AIPROJECTS | ❌ No posible | ✅ `issuetype.id=10003` + `parent.key` | Verificado 2026-06-22 |
 | ZNRX | ❌ No posible | ✅ `issuetype.id=18124` + `parent.key` (sin `customfield_25832`) | Verificado 2026-06-25 |
-| SCRX | ❌ No posible (instancia DC, igual que AIPROJECTS/ZNRX) | ✅ `issuetype.id=10003` + `parent.key` | Inferido por instancia |
+| SCRX | ❌ No posible (instancia DC, igual que AIPROJECTS/ZNRX) | ✅ `issuetype.id=10003` + `parent.key` | Verificado 2026-09-16 |
 | SAZ | ❌ No posible (instancia DC, igual que AIPROJECTS/ZNRX) | ✅ `issuetype.id=10003` + `parent.key` | Inferido por instancia |
 
 La limitación es a nivel de instancia Jira Server/DC — confirmada empíricamente en AIPROJECTS (2026-06-22) y ZNRX (2026-06-25).
